@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-
+import { Link, useNavigate } from 'react-router-dom'; // Import routing tools
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate(); // Hook for programmatic navigation
 
   const navLinks = [
-    { name: 'Dashboard', href: '#dashboard' },
-    { name: 'Integrations', href: '#integrations' },
-    { name: 'Docs', href: '#docs' },
-    { name: 'Pricing', href: '#pricing' },
+    { name: 'Dashboard', path: '/dashboard' }, // Updated to absolute paths
+    { name: 'Integrations', path: '#integrations' },
+    { name: 'Docs', path: '#docs' },
+    { name: 'Pricing', path: '#pricing' },
   ];
 
   return (
@@ -16,36 +17,38 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           
-          {/* Logo Section */}
-          <div className="flex items-center">
-            <div className="flex-shrink-0 flex items-center gap-2">
-              <img src="/vinciflow-logo.JPG" alt="VinciFlow Logo" className="h-9 w-9 rounded-lg" />
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                VinciFlow
-              </span>
-            </div>
-          </div>
+          {/* Logo Section - Links back to Home */}
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <img src="/vinciflow-logo.JPG" alt="VinciFlow Logo" className="h-9 w-9 rounded-lg" />
+            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              VinciFlow
+            </span>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.name}
-                href={link.href}
+                to={link.path} // Use 'to' instead of 'href'
                 className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
               >
                 {link.name}
-              </a>
+              </Link>
             ))}
             <div className="flex items-center space-x-4">
-              <button className="text-gray-600 hover:text-gray-900 font-medium">Log in</button>
-              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-md hover:shadow-lg">
+              <button onClick={() => navigate('/login')} className="text-gray-600 hover:text-gray-900 font-medium">Log in</button>
+              {/* Navigate to dashboard on click */}
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
+              >
                 Get Started
               </button>
             </div>
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Button (unchanged logic) */}
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -68,19 +71,21 @@ const Navbar = () => {
         <div className="md:hidden bg-white border-b border-gray-100 animate-in slide-in-from-top duration-300">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.name}
-                href={link.href}
+                to={link.path}
+                onClick={() => setIsOpen(false)} // Close menu on click
                 className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
               >
                 {link.name}
-              </a>
+              </Link>
             ))}
             <div className="pt-4 pb-3 border-t border-gray-100">
-              <button className="w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600">
-                Log in
-              </button>
-              <button className="mt-2 w-full bg-blue-600 text-white px-3 py-2 rounded-md text-base font-medium shadow-sm">
+              <button onClick={() => { navigate('/login'); setIsOpen(false); }}className="w-full text-left px-3 py-2 text-base font-medium text-gray-700">Log in</button>
+              <button 
+                onClick={() => { navigate('/dashboard'); setIsOpen(false); }}
+                className="mt-2 w-full bg-blue-600 text-white px-3 py-2 rounded-md text-base font-medium"
+              >
                 Get Started
               </button>
             </div>
