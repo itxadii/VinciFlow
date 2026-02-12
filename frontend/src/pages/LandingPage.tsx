@@ -3,17 +3,17 @@ import HeroSection from '../components/landingpage/HeroSection';
 
 const LandingPage = () => {
   return (
-    <main>
-      {/* You can add more sections here later, like Features, Pricing, or FAQ */}
+    <div className="w-full">
       <HeroSection />
       
-      {/* Example of adding another section later */}
-      <section id="features" className="py-20 bg-gray-50">
+      {/* We can add a "Live Preview" section here next */}
+      <section className="py-24 bg-gray-300 border-y border-gray-300">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold">Scalable AI Automation</h2>
+          <h2 className="text-4xl font-bold mb-4">One Click. Everywhere.</h2>
+          <p className="text-gray-500 text-lg">Your brand, synchronized across the social web.</p>
         </div>
       </section>
-    </main>
+    </div>
   );
 };
 
