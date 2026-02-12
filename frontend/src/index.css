@@ -1,6 +1,24 @@
 @import "tailwindcss";
 
+:root {
+  --gemini-pink: #FF4B8B;
+  --gemini-purple: #8E75C2;
+  --gemini-blue: #00C2FF;
+}
+
 body {
-    background-color: #e5e7eb; /* bg-gray-200 */
-    color: #687485; /* text-gray-800 */
+  /* Applying Montserrat as the primary font and Slate-200 as requested */
+  @apply bg-slate-200 text-slate-900 antialiased overflow-x-hidden;
+  font-family: 'Montserrat', sans-serif;
+}
+/* Custom Gradient Text Utility */
+.text-gradient {
+  @apply bg-gradient-to-r from-[var(--gemini-pink)] via-[var(--gemini-purple)] to-[var(--gemini-blue)] bg-clip-text text-transparent;
+}
+
+nav {
+  /* Vendor prefix for Safari/Older Chrome */
+  -webkit-backdrop-filter: blur(20px);
+  /* Standard property for modern browsers */
+  backdrop-filter: blur(20px);
 }

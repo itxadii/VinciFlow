@@ -1,93 +1,102 @@
-import React, { useState } from 'react';
-
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X } from 'lucide-react'; // Icons for better mobile UI
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const navLinks = [
-    { name: 'Dashboard', href: '#dashboard' },
-    { name: 'Integrations', href: '#integrations' },
-    { name: 'Docs', href: '#docs' },
-    { name: 'Pricing', href: '#pricing' },
+    { name: 'Integrations', path: '/integrations' },
+    { name: 'Docs', path: '/docs' },
+    { name: 'Pricing', path: '/pricing' },
   ];
 
   return (
-    <nav className="fixed w-full z-50 top-0 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          
-          {/* Logo Section */}
-          <div className="flex items-center">
-            <div className="flex-shrink-0 flex items-center gap-2">
-              <img src="/vinciflow-logo.JPG" alt="VinciFlow Logo" className="h-9 w-9 rounded-lg" />
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                VinciFlow
-              </span>
-            </div>
-          </div>
+    
+    <div className="fixed w-full top-6 z-50 px-4 flex justify-center">
+      {/* Main Island Container */}
+      <nav className={`w-full max-w-5xl bg-white/70 backdrop-blur-xl border border-gray-500 shadow-xl transition-all duration-300 ${isOpen ? 'rounded-3xl' : 'rounded-full'}`}>
+        <div className="px-6 py-3">
+          <div className="flex justify-between items-center">
+            
+            {/* Logo Section */}
+            <Link to="/" className="flex items-center gap-2">
+              <img src="/vinciflow-logo.JPG" alt="VinciFlow" className="h-8 w-8 rounded-full" />
+  
+            <span className="text-3xl font-bold text-slate-900 font-['Caveat']">
+              VinciFlow
+            </span>
+            </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
-              >
-                {link.name}
-              </a>
-            ))}
-            <div className="flex items-center space-x-4">
-              <button className="text-gray-600 hover:text-gray-900 font-medium">Log in</button>
-              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-md hover:shadow-lg">
-                Get Started
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-blue-600 focus:outline-none"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {isOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Menu Overlay */}
-      {isOpen && (
-        <div className="md:hidden bg-white border-b border-gray-100 animate-in slide-in-from-top duration-300">
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-              >
-                {link.name}
-              </a>
-            ))}
-            <div className="pt-4 pb-3 border-t border-gray-100">
-              <button className="w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600">
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-6">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.path}
+                  className="text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors"
+                >
+                  {link.name}
+                </Link>
+              ))}
+              <div className="h-6 w-[1px] bg-gray-300 mx-2" />
+              <button onClick={() => navigate('/login')} className="text-sm font-bold text-slate-700 hover:text-slate-900">
                 Log in
               </button>
-              <button className="mt-2 w-full bg-blue-600 text-white px-3 py-2 rounded-md text-base font-medium shadow-sm">
+              <span className="text-3xl font-bold text-slate-900 font-['Handlee']">
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="bg-blue-600 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+              >
                 Get Started
+              </button>
+              </span>
+            </div>
+
+            {/* Mobile Menu Toggle */}
+            <div className="md:hidden flex items-center">
+              <button 
+                onClick={() => setIsOpen(!isOpen)} 
+                className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                {isOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
             </div>
           </div>
+
+          {/* Mobile Dropdown - Now visible because it's inside the pill height expansion */}
+          {isOpen && (
+            <div className="md:hidden pt-4 pb-2 space-y-2 animate-in fade-in zoom-in duration-200">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.path}
+                  onClick={() => setIsOpen(false)}
+                  className="block px-4 py-3 text-base font-semibold text-slate-700 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  {link.name}
+                </Link>
+              ))}
+              <div className="pt-4 border-t border-gray-200 flex flex-col gap-3">
+                <button 
+                  onClick={() => { navigate('/login'); setIsOpen(false); }}
+                  className="w-full py-3 text-base font-bold text-slate-700 text-center"
+                >
+                  Log in
+                </button>
+                <button 
+                  onClick={() => { navigate('/dashboard'); setIsOpen(false); }}
+                  className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-center shadow-lg"
+                >
+                  Get Started
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </nav>
+      </nav>
+    </div>
   );
 };
 
