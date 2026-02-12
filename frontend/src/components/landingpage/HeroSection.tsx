@@ -18,11 +18,11 @@ const HeroSection = () => {
         </motion.div>
 
         <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-slate-900 mb-8 leading-[0.9] font-sans">
-          Post <span className="bg-gradient-to-r from-[#FF4B8B] via-[#8E75C2] to-[#00C2FF] bg-clip-text text-transparent">Smarter</span> <br /> 
-          Not Harder.
+          Post <span className="font-['Handlee']">With</span> a <span className="bg-gradient-to-r from-[#FF4B8B] via-[#8E75C2] to-[#00C2FF] bg-clip-text text-transparent font-['Handlee']">Flow</span> <br /> 
+          
         </h1>
         <p className="text-xl md:text-2xl text-slate-500 max-w-3xl mx-auto mb-12 font-medium leading-relaxed">
-          The autonomous engine that synthesizes high-impact posters and orchestrates 
+          The engine that synthesizes high-impact posters and orchestrates 
           your social growth across all platforms instantly.
         </p>
 
