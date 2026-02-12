@@ -1,5 +1,4 @@
-import React from 'react';
-import { Instagram, Twitter, Facebook, Globe, ShieldCheck } from 'lucide-react';
+import { Instagram, Twitter, Facebook} from 'lucide-react';
 
 const integrations = [
   { name: 'Instagram', desc: 'Direct publishing to Feed and Stories via Meta Graph API.', icon: <Instagram className="text-pink-600" />, status: 'soon' },

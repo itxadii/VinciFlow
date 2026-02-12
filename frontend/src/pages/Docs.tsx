@@ -1,5 +1,3 @@
-import React from 'react';
-
 const Docs = () => (
   <div className="pt-32 pb-20 px-4 max-w-5xl mx-auto">
     <div className="flex flex-col md:flex-row gap-12">

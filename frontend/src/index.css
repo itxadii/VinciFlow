@@ -17,5 +17,8 @@ body {
 }
 
 nav {
+  /* Vendor prefix for Safari/Older Chrome */
   -webkit-backdrop-filter: blur(20px);
+  /* Standard property for modern browsers */
+  backdrop-filter: blur(20px);
 }
