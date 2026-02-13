@@ -1,0 +1,81 @@
+# ------------------------------------
+# General
+# ------------------------------------
+.DS_Store
+.env
+.env.*
+*.log
+*.tmp
+
+# ------------------------------------
+# Node / Vite / React (Frontend)
+# ------------------------------------
+node_modules/
+dist/
+.vite/
+public/build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Package managers
+.npm/
+.pnp/
+.pnp.js
+
+# ------------------------------------
+# Python Backend
+# ------------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+backend/src/build
+*.zip
+
+# Virtual environment
+venv/
+.env/
+
+# ------------------------------------
+# Terraform
+# ------------------------------------
+# Backend build folder
+backend/src/build/
+
+# Terraform (ignore everything except .tf source files)
+
+# Terraform directories
+**/.terraform/
+**/.terraform/*
+
+# Local state files
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfstate.backup
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Sensitive variable files
+*.tfvars
+*.tfvars.json
+
+# Ignore override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform plan output
+*.tfplan
+*.tfplan.*.json
+.terraform.lock.hcl
+
+

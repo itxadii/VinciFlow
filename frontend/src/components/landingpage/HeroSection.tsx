@@ -17,12 +17,12 @@ const HeroSection = () => {
           <span className="font-['Handlee']">Next-Gen AI Content Orchestration</span>
         </motion.div>
 
-        <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-slate-900 mb-8 leading-[0.9] font-sans">
-          Post <span className="bg-gradient-to-r from-[#FF4B8B] via-[#8E75C2] to-[#00C2FF] bg-clip-text text-transparent">Smarter</span> <br /> 
-          Not Harder.
+        <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-slate-800 mb-8 leading-[0.9] font-sans ">
+          Post <span className="font-['Handlee']">With</span> a <span className="bg-gradient-to-r from-[#FF4B8B] via-[#8E75C2] to-[#00C2FF] bg-clip-text text-transparent font-['Handlee']">Flow</span> <br /> 
+          
         </h1>
         <p className="text-xl md:text-2xl text-slate-500 max-w-3xl mx-auto mb-12 font-medium leading-relaxed">
-          The autonomous engine that synthesizes high-impact posters and orchestrates 
+          The engine that synthesizes high-impact posters and orchestrates 
           your social growth across all platforms instantly.
         </p>
 
@@ -37,7 +37,7 @@ const HeroSection = () => {
             <div className="absolute inset-0 bg-gradient-to-r from-[#8E75C2] to-[#00C2FF] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </button>
           <span className="relative z-10 flex items-center gap-2 font-['Handlee']">
-          <button className="px-10 py-5 bg-white/80 backdrop-blur-sm text-slate-900 border-2 border-white rounded-2xl font-bold text-lg hover:bg-white transition-all shadow-lg">
+          <button className="px-10 py-5 backdrop-blur-sm text-slate-900 border-2 border-white rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all shadow-lg bg-yellow-50">
             See the Magic ✨
           </button>
           </span>
