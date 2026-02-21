@@ -1,54 +1,59 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/landingpage/Navbar';
 import LandingPage from './pages/LandingPage';
-import Login from './pages/Login';
 import Pricing from './pages/Pricing';
 import Docs from './pages/Docs';
 import Integrations from './pages/Integrations';
 import FloatingIcons from './components/FloatingIcons';
 import ChatPage from './pages/ChatPage';
-import { Authenticator } from '@aws-amplify/ui-react'
+import AuthPage from './pages/auth/AuthPage';
+import CustomLogin from './pages/auth/CustomLogin';
+import CustomSignUp from './pages/auth/CustomSignUp';
+import ConfirmAccount from './pages/auth/ConfirmAccount';
 
 const App = () => {
-  <Authenticator>
-      {({ signOut, user }) => (
-        <main>
-          {/* Now ChatPage has access to the user's token! */}
-          <ChatPage /> 
-          <button 
-            onClick={signOut}
-            className="fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded"
-          >
-            Sign Out
-          </button>
-        </main>
-      )}
-  </Authenticator>
+  // 1. Hook to get current path
+  const location = useLocation();
+  
+  // 2. Determine if we are on the chat page
+  const isChatPage = location.pathname === '/chat';
+
   return (
     <>
-      {/* Navbar stays outside because we want it on EVERY page */}
-      <Navbar /> 
-      <FloatingIcons />
-      <Routes>
-        <Route path="/chat" element={<ChatPage />} />
-        {/* If path is "/", show ONLY LandingPage */}
-        <Route path="/" element={<LandingPage />} />
-        
-        {/* If path is "/login", show ONLY Login */}
-        <Route path="/login" element={<Login />} />
+      {/* 3. Conditional Rendering: Only show Navbar and Icons if NOT in chat */}
+      {!isChatPage && (
+        <>
+          <Navbar />
+          <FloatingIcons />
+        </>
+      )}
 
-        <Route path="pricing" element={<Pricing />} />
-        <Route path="docs" element={<Docs />} />
-        <Route path="integrations" element={<Integrations />} />
+      <Routes>
+        {/* Protected Route: Wrapped in your AuthPage gatekeeper */}
+        <Route 
+          path="/chat" 
+          element={
+            <AuthPage>
+              <ChatPage />
+            </AuthPage>
+          } 
+        />
+
+        {/* Public Routes */}
+        <Route path="/signup" element={<CustomSignUp />} />
+        <Route path="/confirm" element={<ConfirmAccount />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<CustomLogin />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/docs" element={<Docs />} />
+        <Route path="/integrations" element={<Integrations />} />
         
-        {/* Dashboard Route */}
         <Route path="/dashboard" element={
           <div className="pt-24 p-8 text-center font-bold">
             VinciFlow Dashboard (Gemini Integration Soon)
           </div>
         } />
 
-        {/* Catch-all 404 */}
         <Route path="*" element={<div className="pt-24 text-center">404 - Not Found</div>} />
       </Routes>
     </>

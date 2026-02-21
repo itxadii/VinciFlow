@@ -50,6 +50,7 @@ module "lambda" {
   iam_role_arn    = module.iam.lambda_role_arn
   dynamodb_table  = module.dynamodb.table_name
   api_gateway_id  = module.api_gateway.api_id
+  dynamodb_table_arn  = module.dynamodb.table_arn
   
   # Inject the value from SSM directly
   gemini_api_key  = data.aws_ssm_parameter.gemini_key.value

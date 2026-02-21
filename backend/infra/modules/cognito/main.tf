@@ -4,7 +4,8 @@ resource "aws_cognito_user_pool" "pool" {
   name = "vinciflow-${var.env}-user-pool"
 
   # Allows users to log in with their email address
-  alias_attributes = ["email"]
+  username_attributes = ["email"]
+  auto_verified_attributes = ["email"]
 
   schema {
     name                = "brand_voice"
