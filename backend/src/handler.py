@@ -1,65 +1,88 @@
 import os
 import json
 import boto3
+import time
 from boto3.dynamodb.conditions import Key
 import google.generativeai as genai
 
-# 1. Initialize Clients outside the handler for warm-start performance
+# Initialize outside handler for Lambda 'Warm Starts'
 dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
 TABLE_NAME = os.environ.get('DYNAMODB_TABLE')
 table = dynamodb.Table(TABLE_NAME)
 
-# 2. Configure Gemini API
 genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 def handler(event, context):
-    print(f"Event: {json.dumps(event)}")
+    # 1. IMMEDIATE LOGGING: This is what you see in CloudWatch
+    print(f"DEBUG: Full Event received: {json.dumps(event)}")
     
-    http_method = event.get('httpMethod')
-    # Extracts User ID from Cognito Token
-    user_id = event.get('requestContext', {}).get('authorizer', {}).get('claims', {}).get('sub', 'guest-user')
-
     try:
-        # --- Logic for SAVING Memory (POST) ---
-        if http_method == 'POST':
-            body = json.loads(event.get('body', '{}'))
-            table.put_item(Item={
-                'UserId': user_id,
-                'Timestamp': int(os.popen('date +%s').read()), # Unix timestamp
-                'BrandContext': body.get('brandContext'),
-                'Message': body.get('message')
-            })
-            return respond(201, {"message": "Brand memory updated successfully!"})
+        request_context = event.get('requestContext', {})
+        http_info = request_context.get('http', {})
+        method = http_info.get('method')
+        
+        # Identity Extraction (Matches your Cognito setup)
+        user_id = request_context.get('authorizer', {}).get('jwt', {}).get('claims', {}).get('sub', 'anonymous')
 
-        # --- Logic for GENERATING with Memory (GET) ---
-        if http_method == 'GET':
-            # 1. Fetch History from DynamoDB
-            history = table.query(
-                KeyConditionExpression=Key('UserId').eq(user_id),
-                Limit=5,
-                ScanIndexForward=False
-            ).get('Items', [])
+        if method == 'POST':
+            try:
+                body = json.loads(event.get('body', '{}'))
+                user_message = body.get('message', '')
+                
+                if not user_message:
+                    return respond(400, {"error": "No message provided"})
 
-            # 2. Build the "Brand-Friendly" Prompt
-            brand_memory = " ".join([item['BrandContext'] for item in history if 'BrandContext' in item])
-            user_prompt = f"Using this brand context: {brand_memory}. Generate a social media post about: {event.get('queryStringParameters', {}).get('topic', 'innovation')}"
+                # A. Fetch Brand Memory
+                history_items = table.query(
+                    KeyConditionExpression=Key('UserId').eq(user_id),
+                    Limit=5,
+                    ScanIndexForward=False
+                ).get('Items', [])
+                
+                # B. Build context
+                memory_string = " ".join([item.get('Message', '') for item in history_items])
+                full_prompt = f"System: Use this context: {memory_string}. User: {user_message}"
 
-            # 3. Call Gemini API
-            response = model.generate_content(user_prompt)
-            
-            return respond(200, {
-                "generatedPost": response.text,
-                "usedMemory": brand_memory
-            })
+                # C. Call Gemini
+                ai_response = model.generate_content(full_prompt)
+                
+                # Safety handle for blocked responses
+                if hasattr(ai_response, 'text') and ai_response.text:
+                    final_text = ai_response.text
+                else:
+                    print("DEBUG: Gemini response was blocked or empty")
+                    final_text = "I'm sorry, I couldn't generate a response for that."
+
+                # D. Save to DynamoDB
+                table.put_item(Item={
+                    'UserId': user_id,
+                    'Timestamp': int(time.time()),
+                    'Message': user_message,
+                    'AIResponse': final_text
+                })
+
+                return respond(200, {"message": final_text, "status": "success"})
+
+            except json.JSONDecodeError as json_err:
+                print(f"ERROR: JSON Parsing failed: {str(json_err)}")
+                return respond(400, {"error": "Invalid JSON body"})
+
+        return respond(405, {"error": "Method not allowed"})
 
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return respond(500, {"error": str(e)})
+        # 2. CRITICAL LOGGING: Logs the exact traceback to CloudWatch
+        print(f"CRITICAL ERROR: {str(e)}")
+        return respond(500, {"error": "Internal Server Error", "details": str(e)})
 
 def respond(status, body):
     return {
         "statusCode": status,
-        "headers": { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST,OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization"
+        },
         "body": json.dumps(body)
     }

@@ -8,3 +8,10 @@ variable "gemini_api_key" {
   type        = string
   sensitive   = true # Prevents the key from showing in terminal logs
 }
+variable "deploy_bucket_id" {
+  type = string
+}
+variable "dynamodb_table_arn" {
+  type        = string
+  description = "The ARN of the DynamoDB table for IAM policy permissions"
+}

@@ -1,56 +1,97 @@
-# backend/infra/modules/lambda/main.tf
-# 1. Trigger the build script
-resource "terraform_data" "lambda_build" {
+# 1. Define the Execution Role for Lambda
+resource "aws_iam_role" "lambda_role" {
+  name = "vinciflow-${var.env}-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+# 2. Basic Execution Policy for CloudWatch Logging
+resource "aws_iam_role_policy_attachment" "lambda_logs" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# 3. DynamoDB Access Policy
+resource "aws_iam_role_policy" "dynamodb_access" {
+  name = "vinciflow-dynamodb-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = ["dynamodb:PutItem", "dynamodb:Query", "dynamodb:GetItem"]
+        Effect   = "Allow"
+        Resource = var.dynamodb_table_arn
+      }
+    ]
+  })
+}
+
+# 4. Consolidated Build & Zip Resource
+# This ensures files exist before Terraform tries to read them.
+resource "terraform_data" "lambda_package" {
   triggers_replace = {
-    # Step out 3 levels: modules/lambda -> modules -> infra -> backend -> src
     handler_hash      = filebase64sha256("${path.module}/../../../src/handler.py")
     requirements_hash = filebase64sha256("${path.module}/../../../src/requirements.txt")
   }
 
+  # First provisioner: Runs Docker build via your script
   provisioner "local-exec" {
     command     = "powershell.exe -ExecutionPolicy Bypass -File ${path.module}/build_lambda.ps1"
     working_dir = path.module
   }
+
+  # Second provisioner: Zips the dist folder AFTER build completes
+  provisioner "local-exec" {
+    command     = "powershell.exe -Command \"Compress-Archive -Path ./dist/* -DestinationPath ./index.zip -Force\""
+    working_dir = path.module
+  }
 }
 
-# 2. Archive the package (This waits for the build)
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/dist" 
-  output_path = "${path.module}/index.zip"
-  
-  # Explicitly wait for the build resource to finish
-  depends_on = [terraform_data.lambda_build]
+# 5. Upload to S3
+# We use filebase64sha256 on the local file directly to force updates.
+resource "aws_s3_object" "lambda_code" {
+  bucket = var.deploy_bucket_id
+  key    = "ai_agent/${filebase64sha256("${path.module}/index.zip")}.zip"
+  source = "${path.module}/index.zip"
+
+  # Crucial: Must wait for the zip to be created
+  depends_on = [terraform_data.lambda_package]
 }
 
+# 6. Create the Lambda Function
 resource "aws_lambda_function" "ai_agent" {
-  # Use the dynamically generated path
-  filename         = data.archive_file.lambda_zip.output_path
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-
   function_name = "vinciflow-${var.env}-ai-agent"
-  role          = var.iam_role_arn
-  handler       = "handler.handler"
-  runtime       = "python3.11"
+  role          = aws_iam_role.lambda_role.arn
+  
+  s3_bucket = aws_s3_object.lambda_code.bucket
+  s3_key    = aws_s3_object.lambda_code.key
 
-  memory_size = 512 # Professional sizing for AI libraries
+  source_code_hash = filebase64sha256("${path.module}/index.zip")
+  handler          = "handler.handler"
+  runtime          = "python3.12"
+  
+  memory_size = 512 
   timeout     = 60
 
   environment {
     variables = {
-      DYNAMODB_TABLE = var.dynamodb_table
       GEMINI_API_KEY = var.gemini_api_key
+      DYNAMODB_TABLE = var.dynamodb_table 
     }
   }
-}
 
-# Permission for API Gateway to call this Lambda
-resource "aws_lambda_permission" "api_gw" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.ai_agent.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:ap-south-1:${data.aws_caller_identity.current.account_id}:${var.api_gateway_id}/*/*"
+  depends_on = [terraform_data.lambda_package]
 }
 
 data "aws_caller_identity" "current" {}
