@@ -1,11 +1,11 @@
-# build_lambda.ps1
-if (Test-Path "./dist") { Remove-Item -Recurse -Force "./dist" }
-New-Item -ItemType Directory -Path "./dist"
+param ([string]$repository_url)
+$ErrorActionPreference = 'Stop'
 
-# Build Linux binaries via Docker
-docker build -t vinciflow-builder .
-docker create --name temp-container vinciflow-builder
-docker cp temp-container:/var/task/dist/. ./dist
-docker rm temp-container
+Write-Host "--- TAGGING & PUSHING TO ECR ---" -ForegroundColor Cyan
+docker tag vinciflow-ai-agent:latest "${repository_url}:latest"
+docker push "${repository_url}:latest"
 
-Write-Host "Linux build extracted to ./dist" -ForegroundColor Green
+if ($LASTEXITCODE -ne 0) { throw "Push Failed!" }
+
+Write-Host "Waiting 20 seconds for AWS indexing..."
+Start-Sleep -Seconds 20
