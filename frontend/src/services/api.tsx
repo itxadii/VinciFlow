@@ -1,7 +1,8 @@
 // src/services/api.ts
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios'; 
+import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'; 
 import { fetchAuthSession } from 'aws-amplify/auth';
-import { ChatResponse } from '../types/chat';
+import type { ChatResponse } from '../types/chat';
 
 // 1. Create a reusable instance
 const apiClient: AxiosInstance = axios.create({

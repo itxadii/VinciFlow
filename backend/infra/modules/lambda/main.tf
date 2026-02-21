@@ -1,8 +1,6 @@
-# backend/infra/modules/lambda/main.tf
-# 1. Trigger the build script
+# 1. Trigger the build script when code changes
 resource "terraform_data" "lambda_build" {
   triggers_replace = {
-    # Step out 3 levels: modules/lambda -> modules -> infra -> backend -> src
     handler_hash      = filebase64sha256("${path.module}/../../../src/handler.py")
     requirements_hash = filebase64sha256("${path.module}/../../../src/requirements.txt")
   }
@@ -13,44 +11,43 @@ resource "terraform_data" "lambda_build" {
   }
 }
 
-# 2. Archive the package (This waits for the build)
+# 2. Archive the package (waits for the build script to finish)
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/dist" 
   output_path = "${path.module}/index.zip"
   
-  # Explicitly wait for the build resource to finish
   depends_on = [terraform_data.lambda_build]
 }
 
-resource "aws_lambda_function" "ai_agent" {
-  # Use the dynamically generated path
-  filename         = data.archive_file.lambda_zip.output_path
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+# 3. Upload the heavy zip (70MB) to S3 first
+resource "aws_s3_object" "lambda_code" {
+  bucket = var.deploy_bucket_id
+  key    = "ai_agent/${data.archive_file.lambda_zip.output_base64sha256}.zip"
+  source = data.archive_file.lambda_zip.output_path
+}
 
+# 4. Create the Lambda Function using the S3 reference
+resource "aws_lambda_function" "ai_agent" {
   function_name = "vinciflow-${var.env}-ai-agent"
   role          = var.iam_role_arn
-  handler       = "handler.handler"
-  runtime       = "python3.11"
+  
+  # Point to S3 instead of local filename to bypass the 50MB limit
+  s3_bucket = aws_s3_object.lambda_code.bucket
+  s3_key    = aws_s3_object.lambda_code.key
 
-  memory_size = 512 # Professional sizing for AI libraries
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  handler          = "handler.handler"
+  runtime          = "python3.12"
+  
+  memory_size = 512 
   timeout     = 60
 
   environment {
     variables = {
-      DYNAMODB_TABLE = var.dynamodb_table
       GEMINI_API_KEY = var.gemini_api_key
+      DYNAMODB_TABLE = var.dynamodb_table # Ensure variable name matches your vars.tf
     }
   }
 }
-
-# Permission for API Gateway to call this Lambda
-resource "aws_lambda_permission" "api_gw" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.ai_agent.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "arn:aws:execute-api:ap-south-1:${data.aws_caller_identity.current.account_id}:${var.api_gateway_id}/*/*"
-}
-
 data "aws_caller_identity" "current" {}

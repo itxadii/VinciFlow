@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Message } from '../types/chat';
+import type { Message } from '../types/chat';
 import { sendMessageToBackend } from '../services/api';
 
 const ChatPage: React.FC = () => {

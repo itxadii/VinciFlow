@@ -6,14 +6,31 @@ import Pricing from './pages/Pricing';
 import Docs from './pages/Docs';
 import Integrations from './pages/Integrations';
 import FloatingIcons from './components/FloatingIcons';
+import ChatPage from './pages/ChatPage';
+import { Authenticator } from '@aws-amplify/ui-react'
 
 const App = () => {
+  <Authenticator>
+      {({ signOut, user }) => (
+        <main>
+          {/* Now ChatPage has access to the user's token! */}
+          <ChatPage /> 
+          <button 
+            onClick={signOut}
+            className="fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded"
+          >
+            Sign Out
+          </button>
+        </main>
+      )}
+  </Authenticator>
   return (
     <>
       {/* Navbar stays outside because we want it on EVERY page */}
       <Navbar /> 
       <FloatingIcons />
       <Routes>
+        <Route path="/chat" element={<ChatPage />} />
         {/* If path is "/", show ONLY LandingPage */}
         <Route path="/" element={<LandingPage />} />
         
