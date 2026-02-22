@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 # 1. Authentication Module (Cognito)
 module "auth" {
   source = "../../modules/cognito"
@@ -9,6 +11,16 @@ module "auth" {
 module "dynamodb" {
   source = "../../modules/dynamodb"
   env    = var.env
+}
+
+module "bedrock_agent" {
+  source = "../../modules/bedrock_agent"
+
+  env                  = "dev"
+  account_id           = data.aws_caller_identity.current.account_id
+  lambda_function_arn  = module.lambda.lambda_function_arn
+  lambda_function_name = module.lambda.lambda_function_name
+  agent_instruction    = "You are the VinciFlow Orchestrator. Help users create posts..."
 }
 
 # 3. IAM Module (Permissions)
