@@ -62,6 +62,8 @@ resource "aws_lambda_function" "ai_agent" {
   function_name = "vinciflow-dev-ai-agent"
   role          = aws_iam_role.lambda_role.arn
   package_type  = "Image"
+  timeout       = 30
+  memory_size   = 512
   
   # THE FIX: Point to the image
   image_uri     = "${aws_ecr_repository.ai_agent.repository_url}:latest"
