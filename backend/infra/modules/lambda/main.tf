@@ -81,4 +81,20 @@ resource "aws_lambda_function" "ai_agent" {
   depends_on = [terraform_data.lambda_package]
 }
 
+resource "aws_iam_role_policy" "lambda_invoke_agent" {
+  name = "VinciFlow-Lambda-Bedrock-Invoke"
+  role = aws_iam_role.lambda_role.id # Aapke Lambda ka role
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = "bedrock:InvokeAgent"
+        Effect   = "Allow"
+        Resource = "arn:aws:bedrock:ap-south-1:256364432182:agent/Y65UM8CFJP"
+      }
+    ]
+  })
+}
+
 data "aws_caller_identity" "current" {}

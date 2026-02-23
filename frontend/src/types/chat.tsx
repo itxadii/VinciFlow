@@ -1,4 +1,5 @@
 // src/types/chat.ts
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -6,7 +7,24 @@ export interface Message {
   timestamp: number;
 }
 
+// 1. Backend Key alignment: 'response' matches your Lambda
 export interface ChatResponse {
-  message: string;
-  status: 'success' | 'error';
+  response: string; 
+  sessionId: string;
+  status?: 'success' | 'error';
+}
+
+// 2. Multimodal Payload for Nova Lite
+export interface FilePayload {
+  name: string;
+  type: string;
+  data: string; // Base64 encoded string
+}
+
+// 3. Strict Request Type for sendMessageToBackend
+export interface ChatRequest {
+  prompt: string;
+  sessionId: string;
+  file?: FilePayload;
+  isTemporary?: boolean;
 }
