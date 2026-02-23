@@ -20,8 +20,6 @@ const Navbar = () => {
       <nav className={`w-full max-w-5xl bg-white/70 backdrop-blur-xl border border-gray-500 shadow-xl transition-all duration-300 bg-white ${isOpen ? 'rounded-3xl' : 'rounded-full'}`}>
         <div className="px-6 py-3">
           <div className="flex justify-between items-center">
-            
-            {/* Logo Section */}
             <Link to="/" className="flex items-center gap-2">
               <img src={logo} alt="VinciFlow" className="h-10 w-10 rounded-full" />
   
