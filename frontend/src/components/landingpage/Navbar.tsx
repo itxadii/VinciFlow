@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react'; // Icons for better mobile UI
-import { logo } from "../../assets/vinciflow-logo.JPG";
-
+import logo from "../../assets/vinciflow-logo.JPG";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
