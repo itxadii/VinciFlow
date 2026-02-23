@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { confirmSignUp } from 'aws-amplify/auth';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import FloatingIcons from '../../components/FloatingIcons'; // Path check kar lena bhai
 
 export default function ConfirmAccount() {

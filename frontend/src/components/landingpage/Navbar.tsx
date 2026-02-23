@@ -24,7 +24,7 @@ const Navbar = () => {
             <Link to="/" className="flex items-center gap-2">
               <img src="/vinciflow-logo.JPG" alt="VinciFlow" className="h-10 w-10 rounded-full" />
   
-            <span className="text-3xl font-bold text-slate-900 font-['Handlee']">
+            <span className="text-2xl font-bold text-slate-900 font-['Handlee']">
               VinciFlow
             </span>
             </Link>
