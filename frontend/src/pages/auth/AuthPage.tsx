@@ -1,5 +1,5 @@
 import React from 'react';
-import { Authenticator, useTheme, View, Text } from '@aws-amplify/ui-react';
+import { Authenticator, View, Text } from '@aws-amplify/ui-react';
 import { LoginHeader } from './LoginHeader';
 
 // Customizing the Authenticator components
