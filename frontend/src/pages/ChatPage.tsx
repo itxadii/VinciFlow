@@ -4,7 +4,6 @@ import { PanelLeftOpen } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import MessageList from '../components/MessageList';
 import ChatInput from '../components/ChatInput';
-import FloatingIcons from '../components/FloatingIcons';
 import { sendMessageToBackend, getChatHistory } from '../services/api';
 import { convertToBase64 } from '../utils/file';
 import type { Message, ChatRequest } from '../types/chat';
@@ -78,8 +77,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
 
   return (
     /* CRITICAL FIX: Ensure no margin/padding on the main container */
-    <div className="flex w-full h-screen overflow-hidden font-['Montserrat'] relative bg-[#f9f9f8] m-0 p-0">
-      <FloatingIcons />
+    <div className="flex w-screen h-screen overflow-hidden font-['Montserrat'] relative bg-[#f9f9f8]">
 
       <Sidebar 
         isOpen={isSidebarOpen} setIsOpen={setSidebarOpen}

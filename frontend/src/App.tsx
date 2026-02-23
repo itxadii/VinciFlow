@@ -47,12 +47,6 @@ const App = () => {
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/docs" element={<Docs />} />
         <Route path="/integrations" element={<Integrations />} />
-        
-        <Route path="/dashboard" element={
-          <div className="pt-24 p-8 text-center font-bold">
-            VinciFlow Dashboard (Gemini Integration Soon)
-          </div>
-        } />
 
         <Route path="*" element={<div className="pt-24 text-center">404 - Not Found</div>} />
       </Routes>

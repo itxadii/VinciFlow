@@ -24,11 +24,7 @@ interface AuthPageProps {
 
 export default function AuthPage({ children }: AuthPageProps) {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      {/* The Authenticator handles the entire state. 
-        If not logged in, it shows the form. 
-        If logged in, it renders the function below.
-      */}
+    <div className="min-h-screen flex">
       <Authenticator 
             loginMechanisms={['email']} // This tells Amplify to treat the field as an Email
             components={components}

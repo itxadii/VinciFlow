@@ -1,17 +1,15 @@
 @import "tailwindcss";
 
-/* --- 1. NEW RESET: Inhe add karo purane configs ke upar --- */
 html, 
 body, 
 #root {
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
 }
 
-/* --- 2. YOUR ORIGINAL CONFIGS (Bina badlav ke) --- */
 :root {
   --gemini-pink: #FF4B8B;
   --gemini-purple: #8E75C2;
@@ -19,9 +17,15 @@ body,
 }
 
 body {
-  /* Montserrat & Slate-200 application kept as is */
-  @apply bg-slate-200 text-slate-900 antialiased overflow-x-hidden;
+  /* REMOVED bg-slate-200 — this was bleeding into chat edges */
+  @apply text-slate-900 antialiased;
   font-family: 'Montserrat', sans-serif;
+  overflow: hidden; /* explicit, not via @apply */
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
 }
 
 .text-gradient {
@@ -34,9 +38,9 @@ nav {
 }
 
 .scrollbar-hide::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
