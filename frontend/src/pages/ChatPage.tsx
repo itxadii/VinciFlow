@@ -1,179 +1,122 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-
-import { sendMessageToBackend } from '../services/api';
-import { convertToBase64 } from '../utils/file'; 
+import { PanelLeftOpen } from 'lucide-react'; 
+import Sidebar from '../components/Sidebar';
+import MessageList from '../components/MessageList';
+import ChatInput from '../components/ChatInput';
+import FloatingIcons from '../components/FloatingIcons';
+import { sendMessageToBackend, getChatHistory } from '../services/api';
+import { convertToBase64 } from '../utils/file';
 import type { Message, ChatRequest } from '../types/chat';
 
-interface ChatPageProps {
-  signOut?: () => void;
-  user?: any;
-}
-
-const ChatPage: React.FC<ChatPageProps> = ({ signOut, user }) => {
+const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, user }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [sessionId] = useState(uuidv4());
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [sessions, setSessions] = useState<{ sessionId: string; lastMsg: string }[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState(uuidv4());
 
-  // Auto-scroll logic: Jab bhi messages update honge, screen niche move karegi
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => { loadSessions(); }, [user]);
+  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading]);
+
+  const loadSessions = async () => {
+    try {
+      const history = await getChatHistory();
+      const uniqueSessions = Array.from(new Set(history.map((m: any) => m.SessionId)))
+        .map(id => ({
+          sessionId: id as string,
+          lastMsg: history.find((m: any) => m.SessionId === id)?.UserMessage || "New Flow"
+        }));
+      setSessions(uniqueSessions);
+    } catch (e) { console.error(e); }
+  };
+
+  const loadSpecificChat = async (sid: string) => {
+    setCurrentSessionId(sid);
+    try {
+      const historyData = await getChatHistory();
+      const chatMsgs: Message[] = historyData
+        .filter((m: any) => m.SessionId === sid)
+        .flatMap((m: any) => [
+          { role: 'user' as const, content: m.UserMessage, id: uuidv4(), timestamp: Number(m.Timestamp) },
+          { role: 'assistant' as const, content: m.AgentResponse, id: uuidv4(), timestamp: Number(m.Timestamp) }
+        ]);
+      setMessages(chatMsgs);
+    } catch (e) { console.error(e); }
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!input.trim() && !selectedFile) || isLoading) return;
 
     const userMsg: Message = {
-      id: Date.now().toString(),
-      role: 'user',
+      id: uuidv4(),
+      role: 'user' as const,
       content: selectedFile ? `📎 [${selectedFile.name}] ${input}` : input,
       timestamp: Date.now(),
     };
     
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
-    const currentInput = input;
-    const currentFile = selectedFile;
-    
-    setInput('');
-    setSelectedFile(null);
 
     try {
-      const payload: ChatRequest = {
-        prompt: currentInput,
-        sessionId: sessionId,
-      };
-
-      if (currentFile) {
-        const base64Data = await convertToBase64(currentFile);
-        payload.file = {
-          name: currentFile.name,
-          type: currentFile.type,
-          data: base64Data
-        };
+      const payload: ChatRequest = { prompt: input, sessionId: currentSessionId };
+      if (selectedFile) {
+        payload.file = { name: selectedFile.name, type: selectedFile.type, data: await convertToBase64(selectedFile) };
       }
-
       const data = await sendMessageToBackend(payload);
-      
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.response, // Backend payload 'response' key matches
-        timestamp: Date.now(),
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-    } catch (error) {
-      console.error("VinciFlow Error:", error);
-    } finally {
-      setIsLoading(false);
-    }
+      const aiMsg: Message = { id: uuidv4(), role: 'assistant' as const, content: data.response, timestamp: Date.now() };
+      setMessages(prev => [...prev, aiMsg]);
+      loadSessions();
+    } catch (error) { console.error(error); } 
+    finally { setIsLoading(false); setInput(''); setSelectedFile(null); }
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 text-gray-900">
-      {/* 1. Header: Resolves unused props warnings */}
-      <header className="p-4 bg-white border-b shadow-sm flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold text-blue-600">VinciFlow AI</h1>
-          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded uppercase font-bold">Dev</span>
-        </div>
+    /* CRITICAL FIX: Ensure no margin/padding on the main container */
+    <div className="flex w-full h-screen overflow-hidden font-['Montserrat'] relative bg-[#f9f9f8] m-0 p-0">
+      <FloatingIcons />
 
-        <div className="flex items-center gap-4">
-          <span className="text-xs font-semibold text-gray-600 hidden sm:block">
-            {user?.signInDetails?.loginId || "VinciFlow User"}
-          </span>
+      <Sidebar 
+        isOpen={isSidebarOpen} setIsOpen={setSidebarOpen}
+        sessions={sessions} currentSessionId={currentSessionId}
+        onSelectSession={loadSpecificChat} onNewChat={() => { setCurrentSessionId(uuidv4()); setMessages([]); }}
+        userEmail={user?.signInDetails?.loginId} onSignOut={signOut}
+      />
+
+      <div className="flex-1 flex flex-col min-w-0 relative bg-transparent h-full">
+        {/* Open Toggle Button (Visible only when hidden) */}
+        {!isSidebarOpen && (
           <button 
-            onClick={signOut}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-all"
+            onClick={() => setSidebarOpen(true)}
+            className="absolute top-10 left-6 z-40 p-2.5 bg-white/80 border border-slate-200 rounded-xl shadow-sm text-slate-600 transition-all active:scale-95"
           >
-            Sign Out
+            <PanelLeftOpen size={20} />
           </button>
-        </div>
-      </header>
+        )}
 
-      {/* 2. Chat History */}
-      <main className="flex-1 overflow-y-auto p-4 md:px-20 space-y-4">
-        {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center opacity-40 text-center">
-            <span className="text-4xl mb-2">✨</span>
-            <p>Welcome to VinciFlow. Upload an image or start typing!</p>
+        {/* Welcome Header */}
+        {messages.length === 0 && !isLoading && (
+          <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center w-full z-0 px-6">
+             <h1 className="text-5xl md:text-6xl font-['Merriweather'] font-bold text-slate-800 mb-6 tracking-tight">
+               Back at it, <span className="font-['Handlee'] text-[#8E75C2]">{user?.signInDetails?.loginId?.split('@')[0] || "Aditya"}</span>
+             </h1>
+             <p className="font-['Handlee'] text-slate-400 text-2xl italic">Ready to synthesize your next flow?</p>
           </div>
         )}
 
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] md:max-w-[75%] px-4 py-3 rounded-2xl shadow-sm ${
-              msg.role === 'user' 
-                ? 'bg-blue-600 text-white rounded-tr-none' 
-                : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none'
-            }`}>
-              <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{msg.content}</p>
-            </div>
-          </div>
-        ))}
-
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 px-4 py-3 rounded-2xl rounded-tl-none text-gray-400 italic text-sm animate-pulse">
-              VinciFlow is thinking...
-            </div>
-          </div>
-        )}
-        <div ref={scrollRef} />
-      </main>
-
-      {/* 3. Footer: Input & File logic */}
-      <footer className="p-4 bg-white border-t">
-        <form onSubmit={handleSend} className="max-w-4xl mx-auto space-y-2">
-          {selectedFile && (
-            <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs w-fit border border-blue-200 animate-in fade-in slide-in-from-bottom-1">
-              📎 {selectedFile.name}
-              <button type="button" onClick={() => setSelectedFile(null)} className="font-bold ml-1 hover:text-red-500">×</button>
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-              accept="image/*,application/pdf"
-            />
-            
-            <button 
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm active:scale-95"
-              title="Upload Image/PDF"
-            >
-              📷
-            </button>
-
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask VinciFlow (analyze logo, brand colors, etc.)..."
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
-            />
-            
-            <button 
-              type="submit" 
-              disabled={isLoading}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold disabled:opacity-50 shadow-md active:scale-95 transition-all"
-            >
-              Send
-            </button>
-          </div>
-        </form>
-      </footer>
+        <MessageList messages={messages} isLoading={isLoading} scrollRef={scrollRef} />
+        
+        <ChatInput 
+          input={input} setInput={setInput} onSend={handleSend}
+          selectedFile={selectedFile} setSelectedFile={setSelectedFile}
+          isLoading={isLoading}
+        />
+      </div>
     </div>
   );
 };

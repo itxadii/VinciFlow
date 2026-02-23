@@ -4,6 +4,7 @@ resource "aws_apigatewayv2_api" "main" {
   name          = "vinciflow-${var.env}-api"
   protocol_type = "HTTP"
 
+  # CoreX ke MOCK integrations ki jagah yahan single block hai
   cors_configuration {
     allow_origins = [
       "http://localhost:5173",
@@ -16,7 +17,7 @@ resource "aws_apigatewayv2_api" "main" {
   }
 }
 
-# The JWT Authorizer (Built-in for HTTP APIs)
+# The JWT Authorizer (Cognito integration)
 resource "aws_apigatewayv2_authorizer" "cognito" {
   api_id           = aws_apigatewayv2_api.main.id
   authorizer_type  = "JWT"
@@ -31,37 +32,76 @@ resource "aws_apigatewayv2_authorizer" "cognito" {
 
 # The Integration with your Lambda
 resource "aws_apigatewayv2_integration" "lambda_handler" {
-  api_id             = aws_apigatewayv2_api.main.id
-  integration_type   = "AWS_PROXY"
-  integration_uri    = var.lambda_function_invoke_arn
+  api_id                 = aws_apigatewayv2_api.main.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = var.lambda_function_invoke_arn
   payload_format_version = "2.0"
 }
 
-# Specific Route for the AI Agent
-resource "aws_apigatewayv2_route" "ai_route" {
+# --- ROUTES ---
+
+# 1. POST Route for Chat (AI Agent)
+resource "aws_apigatewayv2_route" "chat_post" {
   api_id    = aws_apigatewayv2_api.main.id
-  route_key = "POST /" # Only protect the POST call
+  route_key = "POST /" 
   target    = "integrations/${aws_apigatewayv2_integration.lambda_handler.id}"
   
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
-# Default Stage with Auto-Deploy
+# 2. GET Route for History (SOLVES 404 ERROR)
+resource "aws_apigatewayv2_route" "history_get" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /" 
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_handler.id}"
+  
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# Optional: Catch-all route to prevent 404s on other paths
+resource "aws_apigatewayv2_route" "any_proxy" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "ANY /{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_handler.id}"
+  
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# --- DEPLOYMENT ---
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.main.id
   name        = "$default"
   auto_deploy = true
 }
 
-# Give API Gateway permission to trigger Lambda
 resource "aws_lambda_permission" "api_gw" {
-  # Add the environment to make it unique
   statement_id  = "AllowExecutionFromAPIGateway-${var.env}" 
   action        = "lambda:InvokeFunction"
   function_name = var.lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  
-  # This covers all routes in your API
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+}
+
+# backend/infra/modules/api_gateway/main.tf
+
+# 1. Sabse pehle OPTIONS route banayein jisme koi Authorization na ho
+resource "aws_apigatewayv2_route" "options_route" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "OPTIONS /{proxy+}" # Sabhi paths ke liye OPTIONS handle karega
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_handler.id}"
+  
+  authorization_type = "NONE"
+}
+
+# 2. Same for root path OPTIONS
+resource "aws_apigatewayv2_route" "options_root" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "OPTIONS /"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_handler.id}"
+  
+  authorization_type = "NONE"
 }

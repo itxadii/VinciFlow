@@ -25,7 +25,22 @@ apiClient.interceptors.request.use(async (config) => {
 });
 
 export const sendMessageToBackend = async (payload: ChatRequest): Promise<ChatResponse> => {
-  // Yahan apiClient ko correctly use kiya gaya hai
-  const response = await apiClient.post<ChatResponse>('/', payload);
+  // '/' ko hata kar empty string '' use karo agar baseURL mein stage name hai
+  const response = await apiClient.post<ChatResponse>('', { 
+    prompt: payload.prompt,
+    sessionId: payload.sessionId,
+    file: payload.file || null,
+    isTemporary: payload.isTemporary || false
+  });
   return response.data;
+};
+
+export const getChatHistory = async (): Promise<any[]> => {
+  try {
+    const response = await apiClient.get('/'); 
+    return response.data.history; // Backend returns { history: [...] }
+  } catch (error) {
+    console.error("Error fetching history:", error);
+    throw error;
+  }
 };

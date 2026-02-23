@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* --- 1. NEW RESET: Inhe add karo purane configs ke upar --- */
+html, 
+body, 
+#root {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden;
+}
+
+/* --- 2. YOUR ORIGINAL CONFIGS (Bina badlav ke) --- */
 :root {
   --gemini-pink: #FF4B8B;
   --gemini-purple: #8E75C2;
@@ -7,18 +19,24 @@
 }
 
 body {
-  /* Applying Montserrat as the primary font and Slate-200 as requested */
+  /* Montserrat & Slate-200 application kept as is */
   @apply bg-slate-200 text-slate-900 antialiased overflow-x-hidden;
   font-family: 'Montserrat', sans-serif;
 }
-/* Custom Gradient Text Utility */
+
 .text-gradient {
   @apply bg-gradient-to-r from-[var(--gemini-pink)] via-[var(--gemini-purple)] to-[var(--gemini-blue)] bg-clip-text text-transparent;
 }
 
 nav {
-  /* Vendor prefix for Safari/Older Chrome */
   -webkit-backdrop-filter: blur(20px);
-  /* Standard property for modern browsers */
   backdrop-filter: blur(20px);
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
