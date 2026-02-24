@@ -18,9 +18,13 @@ resource "aws_iam_role_policy" "dynamodb_access" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action   = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"]
+      Action   = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:UpdateItem"]
       Effect   = "Allow"
-      Resource = var.dynamodb_table_arn # Uses the input variable to avoid loops
+      # FIX: Added both ARNs to the resource list
+      Resource = [
+        var.dynamodb_table_arn, 
+        var.brands_table_arn
+      ] 
     }]
   })
 }

@@ -7,7 +7,7 @@ module "auth" {
 }
 
 # 2. Database Module (DynamoDB)
-# Renamed to match your module folder naming convention
+# Isme memory table aur naya brands table dono defined hain.
 module "dynamodb" {
   source = "../../modules/dynamodb"
   env    = var.env
@@ -24,11 +24,12 @@ module "bedrock_agent" {
 }
 
 # 3. IAM Module (Permissions)
-# Passing the table_arn here avoids circular loops
+# Updated: Passing both table ARNs to allow Lambda access to memory AND brands.
 module "iam" {
-  source             = "../../modules/iam"
-  env                = var.env
-  dynamodb_table_arn = module.dynamodb.table_arn 
+  source              = "../../modules/iam"
+  env                 = var.env
+  dynamodb_table_arn  = module.dynamodb.table_arn     # Compatibility (Memory Table)
+  brands_table_arn    = module.dynamodb.brands_table_arn # NEW: Access to Brand Profiles
 }
 
 module "api_gateway" {
@@ -36,17 +37,15 @@ module "api_gateway" {
   env                         = var.env
   lambda_function_invoke_arn  = module.lambda.lambda_function_invoke_arn
   
-  # THE MISSING LINE: Connect the output from lambda to the api input
   lambda_function_name        = module.lambda.lambda_function_name 
   
-  # Ensure these are also connected correctly
   cognito_user_pool_id        = module.auth.user_pool_id
   cognito_client_id           = module.auth.client_id
 }
 
 data "aws_ssm_parameter" "gemini_key" {
   name            = "/corex/gemini_api_key"
-  with_decryption = true # Ensure SecureString is decrypted
+  with_decryption = true 
 }
 
 module "s3" {
@@ -55,15 +54,22 @@ module "s3" {
   bucket_name = "vinciflow-lambda-deployments"
 }
 
+# 4. Lambda Module
+# Updated: Added brands_table name and arn to environment variables and permissions.
 module "lambda" {
-  source          = "../../modules/lambda"
-  env             = var.env
-  deploy_bucket_id = module.s3.bucket_id
-  iam_role_arn    = module.iam.lambda_role_arn
-  dynamodb_table  = module.dynamodb.table_name
-  api_gateway_id  = module.api_gateway.api_id
+  source              = "../../modules/lambda"
+  env                 = var.env
+  deploy_bucket_id    = module.s3.bucket_id
+  iam_role_arn        = module.iam.lambda_role_arn
+  
+  # Existing Memory Table
+  dynamodb_table      = module.dynamodb.table_name
   dynamodb_table_arn  = module.dynamodb.table_arn
   
-  # Inject the value from SSM directly
-  gemini_api_key  = data.aws_ssm_parameter.gemini_key.value
+  # NEW: Brand Table Wiring
+  brands_table_name   = module.dynamodb.brands_table_name
+  brands_table_arn    = module.dynamodb.brands_table_arn
+  
+  api_gateway_id      = module.api_gateway.api_id
+  gemini_api_key      = data.aws_ssm_parameter.gemini_key.value
 }

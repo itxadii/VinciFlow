@@ -7,6 +7,8 @@ import ChatInput from '../components/ChatInput';
 import { sendMessageToBackend, getChatHistory } from '../services/api';
 import { convertToBase64 } from '../utils/file';
 import type { Message, ChatRequest } from '../types/chat';
+import { getBrandProfile } from '../services/brandApi'; 
+import { useNavigate } from 'react-router-dom';
 
 const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, user }) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -16,6 +18,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [sessions, setSessions] = useState<{ sessionId: string; lastMsg: string }[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState(uuidv4());
+  const navigate = useNavigate();
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -23,6 +26,21 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
   useEffect(() => { 
   loadSessions(); 
   }, [user]);
+
+  useEffect(() => {
+    const checkBrand = async () => {
+      try {
+        const brandData = await getBrandProfile(); 
+        if (!brandData) {
+          // FIX 2: Use the 'navigate' function, NOT the hook
+          navigate('/onboarding'); 
+        }
+      } catch (e) {
+        console.error("Brand check failed", e);
+      }
+    };
+    if (user) checkBrand();
+  }, [user, navigate]);
 
   useEffect(() => { 
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); 

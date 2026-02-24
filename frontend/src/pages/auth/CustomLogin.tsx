@@ -2,23 +2,40 @@ import React, { useState, useEffect } from 'react';
 import { signIn, getCurrentUser } from 'aws-amplify/auth';
 import { useNavigate, Link } from 'react-router-dom';
 import FloatingIcons from '../../components/FloatingIcons';
+// Import the brand check function
+import { getBrandProfile } from '../../services/brandApi';
 
 export default function CustomLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [checkingAuth, setCheckingAuth] = useState(true); // Loading state for auth check
+  const [checkingAuth, setCheckingAuth] = useState(true); 
   const navigate = useNavigate();
 
-  // 1. Redirect logic: If already authenticated, go to chat
+  // 1. Unified Navigation Logic
+  const navigateBasedOnBrand = async () => {
+    try {
+      const brandData = await getBrandProfile();
+      if (brandData) {
+        navigate('/chat', { replace: true });
+      } else {
+        // If brandApi returns null (404), user needs onboarding
+        navigate('/onboarding', { replace: true });
+      }
+    } catch (err) {
+      console.error("Brand verification failed:", err);
+      // Fallback: stay on safe side or send to onboarding
+      navigate('/onboarding');
+    }
+  };
+
+  // 2. Auto-login check
   useEffect(() => {
     const checkUser = async () => {
       try {
         await getCurrentUser();
-        // If successful, user is logged in, send to chat
-        navigate('/chat', { replace: true }); 
+        await navigateBasedOnBrand(); // Use the smart check
       } catch (err) {
-        // User not logged in, stay on login page
         setCheckingAuth(false);
       }
     };
@@ -27,32 +44,30 @@ export default function CustomLogin() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(''); // Clear previous errors
     try {
       const { isSignedIn } = await signIn({ username: email, password });
       if (isSignedIn) {
-        navigate('/chat');
+        await navigateBasedOnBrand(); // Use the smart check
       }
     } catch (err: any) {
       setError(err.message || "Login failed. Check your credentials.");
     }
   };
 
-  // Auth check ke waqt blank screen ya loader dikhana zaroori hai
+  // Auth check UI
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-[#f9f9f8] flex items-center justify-center">
-        <div className="animate-pulse font-['Handlee'] text-slate-400">Verifying session...</div>
+        <div className="animate-pulse font-['Handlee'] text-slate-400">Verifying session & brand aura...</div>
       </div>
     );
   }
 
   return (
     <div className="relative min-h-screen flex flex-col justify-center items-center px-6 overflow-hidden bg-[#f9f9f8]">
-      
-      {/* 1. Global Floating Background Layers */}
       <FloatingIcons />
 
-      {/* 2. Login Card with Glassmorphism */}
       <div className="w-full max-w-md z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="bg-white/40 backdrop-blur-2xl border border-white/60 p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200/30">
           
@@ -76,14 +91,14 @@ export default function CustomLogin() {
               <input
                 type="email"
                 placeholder="Email address"
-                className="w-full px-5 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-bold text-slate-700"
+                className="w-full px-5 py-4 bg-white/50 border border-slate-200 rounded-2xl outline-none transition-all font-bold text-slate-700 focus:ring-2 focus:ring-[#8E75C2]/20"
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
               <input
                 type="password"
                 placeholder="Password"
-                className="w-full px-5 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-bold text-slate-700"
+                className="w-full px-5 py-4 bg-white/50 border border-slate-200 rounded-2xl outline-none transition-all font-bold text-slate-700 focus:ring-2 focus:ring-[#8E75C2]/20"
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />

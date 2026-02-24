@@ -1,5 +1,5 @@
 import React from 'react';
-import { PanelLeftClose, PlusCircle, LogOut } from 'lucide-react';
+import { PanelLeftClose, Workflow, LogOut } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 interface SidebarProps {
@@ -55,9 +55,9 @@ const Sidebar: React.FC<SidebarProps> = ({
           
           <button 
             onClick={() => { onNewChat(); if(window.innerWidth < 768) setIsOpen(false); }}
-            className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-slate-400/20 border border-slate-400 rounded-xl hover:bg-slate-400/40 transition-all font-['Merriweather'] font-bold text-sm text-slate-800"
+            className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-slate-400/20 border-4 border-slate-400 rounded-full hover:bg-slate-400/40 transition-all font-['Merriweather'] font-bold text-sm text-slate-800"
           >
-            <PlusCircle size={18} /> New Chat
+            <Workflow size={18} /> New Flow
           </button>
         </div>
 
@@ -74,13 +74,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 if (session.sessionId) onSelectSession(session.sessionId); 
                 if(window.innerWidth < 768) setIsOpen(false); 
               }}
-              className={`w-full text-left p-3 rounded-xl transition-all font-['Merriweather'] font-bold ${
+              className={`w-full text-left p-3 rounded-full transition-all font-['Merriweather'] font-bold ${
                 currentSessionId === session.sessionId 
                   ? 'bg-slate-400/50 text-slate-900 shadow-sm' 
                   : 'text-slate-600 hover:bg-slate-400/20'
               }`}
             >
-              <span className="text-sm truncate block">{session.lastMsg || "New Conversation"}</span>
+              <span className="text-sm truncate block font-['Merriweather'] font-bold">{session.lastMsg || "New Conversation"}</span>
             </button>
           ))}
         </div>

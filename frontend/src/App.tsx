@@ -10,18 +10,17 @@ import AuthPage from './pages/auth/AuthPage';
 import CustomLogin from './pages/auth/CustomLogin';
 import CustomSignUp from './pages/auth/CustomSignUp';
 import ConfirmAccount from './pages/auth/ConfirmAccount';
+import Onboarding from './pages/auth/Onboarding';
 
 const App = () => {
-  // 1. Hook to get current path
   const location = useLocation();
   
-  // 2. Determine if we are on the chat page
-  const isChatPage = location.pathname === '/chat';
+  // FIX: Navbar/Icons hide on BOTH chat and onboarding
+  const isAppView = ['/chat', '/onboarding'].includes(location.pathname);
 
   return (
     <>
-      {/* 3. Conditional Rendering: Only show Navbar and Icons if NOT in chat */}
-      {!isChatPage && (
+      {!isAppView && (
         <>
           <Navbar />
           <FloatingIcons />
@@ -29,12 +28,22 @@ const App = () => {
       )}
 
       <Routes>
-        {/* Protected Route: Wrapped in your AuthPage gatekeeper */}
+        {/* Protected Chat Route */}
         <Route 
           path="/chat" 
           element={
             <AuthPage>
               <ChatPage />
+            </AuthPage>
+          } 
+        />
+
+        {/* NEW: Protected Onboarding Route */}
+        <Route 
+          path="/onboarding" 
+          element={
+            <AuthPage>
+              <Onboarding />
             </AuthPage>
           } 
         />
@@ -48,7 +57,7 @@ const App = () => {
         <Route path="/docs" element={<Docs />} />
         <Route path="/integrations" element={<Integrations />} />
 
-        <Route path="*" element={<div className="pt-24 text-center">404 - Not Found</div>} />
+        <Route path="*" element={<div className="pt-24 text-center text-slate-500 font-['Merriweather']">404 - Aura Not Found</div>} />
       </Routes>
     </>
   );

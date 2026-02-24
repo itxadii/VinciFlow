@@ -5,7 +5,7 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import type { ChatRequest, ChatResponse } from '../types/chat'; // Central types use karo
 
 // 1. apiClient ko define karna zaroori hai
-const apiClient: AxiosInstance = axios.create({
+export const apiClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   headers: { 'Content-Type': 'application/json' },
 });

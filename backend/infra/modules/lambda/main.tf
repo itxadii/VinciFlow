@@ -20,6 +20,7 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
 }
 
 # 3. COMPREHENSIVE POLICY: Bedrock + DynamoDB
+# 3. COMPREHENSIVE POLICY: Bedrock + DynamoDB (Memory & Brands)
 resource "aws_iam_role_policy" "vinciflow_access_policy" {
   name = "vinciflow-${var.env}-access-policy"
   role = aws_iam_role.lambda_role.id
@@ -27,7 +28,6 @@ resource "aws_iam_role_policy" "vinciflow_access_policy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Bedrock Agent & Runtime Access
       {
         Action   = [
           "bedrock:InvokeAgent",
@@ -36,21 +36,20 @@ resource "aws_iam_role_policy" "vinciflow_access_policy" {
         ]
         Effect   = "Allow"
         Resource = [
-          # specific agent resources
           "arn:aws:bedrock:ap-south-1:256364432182:agent/Y65UM8CFJP",
           "arn:aws:bedrock:ap-south-1:256364432182:agent-alias/Y65UM8CFJP/*",
-          # Inference Profile (Specific to your call region us-east-1)
           "arn:aws:bedrock:us-east-1:256364432182:inference-profile/us.amazon.nova-lite-v1:0",
-          # FIX: Wildcard region for the foundation model
-          # Isse east-1, east-2, aur west-2 sab cover ho jayenge automatic
           "arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0" 
         ]
       },
-      # DynamoDB Memory Access
+      # DynamoDB Access (Memory AND Brands)
       {
         Action   = ["dynamodb:PutItem", "dynamodb:Query", "dynamodb:GetItem", "dynamodb:UpdateItem"]
         Effect   = "Allow"
-        Resource = var.dynamodb_table_arn
+        Resource = [
+          var.dynamodb_table_arn,
+          var.brands_table_arn
+        ]
       }
     ]
   })
@@ -88,6 +87,7 @@ data "aws_ecr_image" "lambda_image" {
 }
 
 # 7. THE FUNCTION
+# 7. THE FUNCTION
 resource "aws_lambda_function" "ai_agent" {
   function_name = "vinciflow-dev-ai-agent"
   role          = aws_iam_role.lambda_role.arn
@@ -95,12 +95,13 @@ resource "aws_lambda_function" "ai_agent" {
   timeout       = 30
   memory_size   = 512
   
-  # DIGEST BASED URI: Ensures AWS pulls the new image every time
   image_uri = "${aws_ecr_repository.ai_agent.repository_url}@${data.aws_ecr_image.lambda_image.id}"
 
   environment {
     variables = {
       DYNAMODB_TABLE_NAME    = var.dynamodb_table 
+      # NEW: Environment variable for Brand Onboarding logic
+      BRANDS_TABLE_NAME      = var.brands_table_name 
       BEDROCK_AGENT_ID       = "Y65UM8CFJP"
       BEDROCK_AGENT_ALIAS_ID = "TSTALIASID"
       GEMINI_API_KEY         = var.gemini_api_key
