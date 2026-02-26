@@ -16,16 +16,19 @@ export default function CustomLogin() {
   const navigateBasedOnBrand = async () => {
     try {
       const brandData = await getBrandProfile();
-      if (brandData) {
+      
+      // Check if brandData is truly empty OR backend returned 404
+      if (brandData && brandData.brandName) {
         navigate('/chat', { replace: true });
       } else {
-        // If brandApi returns null (404), user needs onboarding
-        navigate('/onboarding', { replace: true });
+        // Agar aap developer ho aur seedha chat test karna chahte ho:
+        console.log("No brand found, staying on login or moving to onboarding");
+        navigate('/onboarding', { replace: true }); 
       }
     } catch (err) {
-      console.error("Brand verification failed:", err);
-      // Fallback: stay on safe side or send to onboarding
-      navigate('/onboarding');
+      // Agar API hi 404 de rahi hai (jo ki empty DB mein normal hai)
+      console.warn("Brand not found, user is likely new.");
+      navigate('/onboarding', { replace: true });
     }
   };
 
