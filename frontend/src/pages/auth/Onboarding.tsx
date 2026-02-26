@@ -26,7 +26,8 @@ const Onboarding: React.FC = () => {
   const handleFinish = async () => {
     try {
       await saveBrandProfile(formData);
-      navigate('/chat'); 
+      // Seedha chat ke bajaye integration page par bhej rahe hain
+      navigate('/connect-x'); 
     } catch (error) {
       console.error("Setup failed:", error);
     }

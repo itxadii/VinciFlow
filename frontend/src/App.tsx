@@ -11,12 +11,18 @@ import CustomLogin from './pages/auth/CustomLogin';
 import CustomSignUp from './pages/auth/CustomSignUp';
 import ConfirmAccount from './pages/auth/ConfirmAccount';
 import Onboarding from './pages/auth/Onboarding';
+// 1. Import the new ConnectX component
+import ConnectX from './pages/auth/ConnectX';
 
 const App = () => {
   const location = useLocation();
   
-  // FIX: Navbar/Icons hide on BOTH chat and onboarding
-  const isAppView = ['/chat', '/onboarding'].includes(location.pathname);
+  /** * FIX: startsWith use karna zyada robust hai trailing slashes ke liye.
+   * Navbar/Icons hide on chat, onboarding, AND connect-x pages.
+   */
+  const isAppView = ['/chat', '/onboarding', '/connect-x'].some(path => 
+    location.pathname.startsWith(path)
+  );
 
   return (
     <>
@@ -28,7 +34,7 @@ const App = () => {
       )}
 
       <Routes>
-        {/* Protected Chat Route */}
+        {/* Protected Application Routes */}
         <Route 
           path="/chat" 
           element={
@@ -38,12 +44,21 @@ const App = () => {
           } 
         />
 
-        {/* NEW: Protected Onboarding Route */}
         <Route 
           path="/onboarding" 
           element={
             <AuthPage>
               <Onboarding />
+            </AuthPage>
+          } 
+        />
+
+        {/* 2. NEW: Protected X Integration Route */}
+        <Route 
+          path="/connect-x" 
+          element={
+            <AuthPage>
+              <ConnectX />
             </AuthPage>
           } 
         />
