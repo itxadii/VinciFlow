@@ -25,8 +25,8 @@ apiClient.interceptors.request.use(async (config) => {
 });
 
 export const sendMessageToBackend = async (payload: ChatRequest): Promise<ChatResponse> => {
-  // '/' ko hata kar empty string '' use karo agar baseURL mein stage name hai
-  const response = await apiClient.post<ChatResponse>('', { 
+  // '' ki jagah '/' use karein taaki root path hit ho
+  const response = await apiClient.post<ChatResponse>('/', { 
     prompt: payload.prompt,
     sessionId: payload.sessionId,
     file: payload.file || null,

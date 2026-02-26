@@ -4,7 +4,6 @@ resource "aws_apigatewayv2_api" "main" {
   name          = "vinciflow-${var.env}-api"
   protocol_type = "HTTP"
 
-  # CoreX ke MOCK integrations ki jagah yahan single block hai
   cors_configuration {
     allow_origins = [
       "http://localhost:5173",
@@ -104,4 +103,21 @@ resource "aws_apigatewayv2_route" "options_root" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda_handler.id}"
   
   authorization_type = "NONE"
+}
+
+# Explicit routes for Brand Profile (Recommended)
+resource "aws_apigatewayv2_route" "brand_post" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /brand"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_handler.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+resource "aws_apigatewayv2_route" "brand_get" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /brand"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_handler.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
