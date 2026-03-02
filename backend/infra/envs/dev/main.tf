@@ -43,15 +43,37 @@ module "api_gateway" {
   cognito_client_id           = module.auth.client_id
 }
 
+module "s3" {
+  source      = "../../modules/s3"
+  env         = var.env
+  bucket_name = "vinciflow-lambda-deployments"
+}
+
+# Fetching Gemini Key
 data "aws_ssm_parameter" "gemini_key" {
   name            = "/corex/gemini_api_key"
   with_decryption = true 
 }
 
-module "s3" {
-  source      = "../../modules/s3"
-  env         = var.env
-  bucket_name = "vinciflow-lambda-deployments"
+# Fetching X (Twitter) Secrets from SSM
+data "aws_ssm_parameter" "x_api_key" {
+  name            = "/vinciflow/x_api_key"
+  with_decryption = true
+}
+
+data "aws_ssm_parameter" "x_api_secret" {
+  name            = "/vinciflow/x_api_secret"
+  with_decryption = true
+}
+
+data "aws_ssm_parameter" "x_client_id" {
+  name            = "/vinciflow/x_client_id"
+  with_decryption = true
+}
+
+data "aws_ssm_parameter" "x_client_secret" {
+  name            = "/vinciflow/x_client_secret"
+  with_decryption = true
 }
 
 # 4. Lambda Module
@@ -72,4 +94,8 @@ module "lambda" {
   
   api_gateway_id      = module.api_gateway.api_id
   gemini_api_key      = data.aws_ssm_parameter.gemini_key.value
+  x_api_key        = data.aws_ssm_parameter.x_api_key.value
+  x_api_secret     = data.aws_ssm_parameter.x_api_secret.value
+  x_client_id      = data.aws_ssm_parameter.x_client_id.value
+  x_client_secret  = data.aws_ssm_parameter.x_client_secret.value
 }

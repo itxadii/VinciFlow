@@ -105,11 +105,11 @@ resource "aws_lambda_function" "ai_agent" {
       BEDROCK_AGENT_ID       = "Y65UM8CFJP"
       BEDROCK_AGENT_ALIAS_ID = "TSTALIASID"
       GEMINI_API_KEY         = var.gemini_api_key
+      X_API_KEY              = var.x_api_key
+      X_API_SECRET           = var.x_api_secret
+      X_CLIENT_ID            = var.x_client_id
+      X_CLIENT_SECRET        = var.x_client_secret
       CODE_VERSION           = terraform_data.lambda_package.output
-      X_API_KEY              = "NH4uOCZWC7SURITA9VylWpIDO"
-      X_API_SECRET           = "Jxan6ZFZfH2P8fITcpQdTE0QlHZwRhNrAhvqaG3moMuNrGFBVn"
-      X_CLIENT_ID            = "VzV4OHhleEl4NE5yQ0JHUWNyM0Q6MTpjaQ"
-      X_CLIENT_SECRET        = "HBjYD0nmS0eQtC2wwVnhc3L2qrmFBMU1h7fBT8iEMxBH_8pV7d"
     }
   }
 
