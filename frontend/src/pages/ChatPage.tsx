@@ -53,13 +53,34 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
 
   // --- 2. Existing Brand Check Logic ---
   useEffect(() => {
-    const checkBrand = async () => {
+    const verifyAccess = async () => {
+      // A. AUTHENTICATION CHECK: Agar user logged in nahi hai
+      if (!user) {
+        console.log("Unauthenticated access - Redirecting to login");
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      // B. BRAND ONBOARDING CHECK: Agar user ka brand data nahi hai
       try {
-        const brandData = await getBrandProfile(); 
-        if (!brandData) navigate('/onboarding'); 
-      } catch (e) { console.error("Brand check failed", e); }
+        const brandData = await getBrandProfile();
+        console.log("Type of brandData:", typeof brandData); // Agar 'string' aaya toh header ka issue hai
+        console.log("Brand Data Content:", brandData);
+        // DEV BYPASS: Agar aap testing kar rahe ho aur onboarding skip karni hai, 
+        // toh niche wali 'if' condition ko comment out kar do.
+        if (!brandData || !brandData.BrandName) {
+           console.warn("No brand aura found - Redirecting to onboarding");
+           navigate('/onboarding', { replace: true });
+        }
+      } catch (err) {
+        // Agar backend 404 deta hai, matlab user naya hai
+        console.error("Brand verify failed, assuming new user:", err);
+        navigate('/onboarding', { replace: true });
+      }
     };
-    if (user) checkBrand();
+
+    // Sirf tabhi check karein jab user object resolve ho jaye
+    verifyAccess();
   }, [user, navigate]);
 
   // --- 3. Existing Chat & Session Logic ---
