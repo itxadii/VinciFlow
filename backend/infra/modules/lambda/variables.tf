@@ -32,21 +32,21 @@ variable "gemini_api_key" {
 }
 
 variable "x_api_key"        { 
-  type = string; 
+  type = string
   sensitive = true 
 }
 
 variable "x_api_secret"     { 
-  type = string; 
+  type = string
   sensitive = true 
 }
 
 variable "x_client_id"      { 
-  type = string; 
+  type = string
   sensitive = true 
 }
 
 variable "x_client_secret"  { 
-  type = string; 
+  type = string
   sensitive = true 
 }
