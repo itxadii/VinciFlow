@@ -134,15 +134,12 @@ def handler(event, context):
             
             # 🚀 Dynamic Multi-Brand Prompt
             prompt = f"""
-            Act as the Head of Social Media for {brand_name} in the {industry} industry. 
-            Your brand tone is {tone}.
+            Act as the Social Media Head for {brand_name}. 
+            Tone: {tone}.
             
-            Task: Create a viral social media caption and 5 trending hashtags for: "{topic}" 
-            Scheduled Date: {date}.
-            
-            Format your response clearly:
-            Caption: [High-quality text in {tone} tone]
-            Hashtags: #Tag1 #Tag2 ...
+            Task: Write a viral post/caption and 5 hashtags for: "{topic}".
+            IMPORTANT: Do NOT include labels like 'Caption:' or 'Hashtags:'. 
+            Just give me the raw text and the tags.
             """
             
             try:
@@ -155,10 +152,11 @@ def handler(event, context):
 
         # --- TASK C: BRAND (Branding Refinement) ---
         if task == "BRAND":
-            # Apply brand tone and industrial context
-            tone = brand_ctx.get('tone', 'Bold')
-            raw = event.get('rawContent')
-            final_content = f"[{tone} Mode] {raw} #JustDoIt"
+            raw = event.get('rawContent', "")
+            
+            clean_content = raw.replace("Caption:", "").replace("Hashtags:", "").replace("**Caption:**", "").replace("**Hashtags:**", "").strip()
+            final_content = f"{clean_content}" 
+            
             return {**event, "finalContent": final_content, "task": "STORE"}
 
         # --- TASK D: STORE (Unified Memory Save) ---
@@ -169,7 +167,7 @@ def handler(event, context):
                 'UserId': user_id,
                 'Timestamp': int(time.time()),
                 'SessionId': session_id,
-                'UserMessage': f"📅 Scheduled Flow: {event.get('date')}", 
+                'UserMessage': f"📅 Drafted Flow: {event.get('date')}", 
                 'AgentResponse': event.get('finalContent'),
                 'ScheduledDate': event.get('date'),
                 'Status': 'DRAFT' # Ready for Accept/Reject on frontend

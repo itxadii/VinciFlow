@@ -7,6 +7,7 @@ interface ResultCardProps {
   hashtags: string[];
   onAccept: () => void;
   onReject: () => void;
+  status?: string;
 }
 
 const ResultCard: React.FC<ResultCardProps> = ({ image, content, hashtags, onAccept, onReject }) => (
