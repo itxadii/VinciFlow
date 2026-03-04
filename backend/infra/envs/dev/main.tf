@@ -23,13 +23,24 @@ module "bedrock_agent" {
   agent_instruction    = "You are the VinciFlow Orchestrator. Help users create posts..."
 }
 
+module "step_functions" {
+  source                   = "../../modules/step_functions"
+  env                      = var.env
+  lambda_intent_parser_arn = module.lambda.lambda_function_arn
+  lambda_generator_arn     = module.lambda.lambda_function_arn 
+  lambda_branding_arn      = module.lambda.lambda_function_arn
+  lambda_storage_arn       = module.lambda.lambda_function_arn
+}
+
 # 3. IAM Module (Permissions)
-# Updated: Passing both table ARNs to allow Lambda access to memory AND brands.
 module "iam" {
-  source              = "../../modules/iam"
-  env                 = var.env
-  dynamodb_table_arn  = module.dynamodb.table_arn     # Compatibility (Memory Table)
-  brands_table_arn    = module.dynamodb.brands_table_arn # NEW: Access to Brand Profiles
+  source                 = "../../modules/iam"
+  env                    = var.env
+  dynamodb_table_arn     = module.dynamodb.table_arn
+  brands_table_arn       = module.dynamodb.brands_table_arn
+  state_machine_arn      = module.step_functions.state_machine_arn
+  # Connect the output from bedrock_agent to the iam variable
+  agent_role_arn = module.bedrock_agent.agent_role_arn 
 }
 
 module "api_gateway" {
@@ -98,4 +109,11 @@ module "lambda" {
   x_api_secret     = data.aws_ssm_parameter.x_api_secret.value
   x_client_id      = data.aws_ssm_parameter.x_client_id.value
   x_client_secret  = data.aws_ssm_parameter.x_client_secret.value
+
+}
+
+resource "aws_ssm_parameter" "sfn_arn" {
+  name  = "/vinciflow/${var.env}/state_machine_arn"
+  type  = "String"
+  value = module.step_functions.state_machine_arn
 }

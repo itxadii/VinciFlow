@@ -1,15 +1,22 @@
-variable "env" {
-  description = "Deployment environment"
-  type        = string
+# backend/infra/modules/iam/variables.tf
+
+variable "env" { 
+  type = string 
 }
 
-variable "dynamodb_table_arn" {
-  description = "The ARN of the chat history (memory) table"
-  type        = string
+variable "dynamodb_table_arn" { 
+  type = string 
 }
 
-# NEW: Input for the Brand Profiles table
-variable "brands_table_arn" {
-  description = "The ARN of the brand profiles table"
+variable "brands_table_arn" { 
+  type = string 
+}
+
+variable "state_machine_arn" { 
+  type = string 
+}
+
+variable "agent_role_arn" {
   type        = string
+  description = "The ARN of the IAM role assigned to the Bedrock Agent"
 }

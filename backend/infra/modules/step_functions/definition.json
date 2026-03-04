@@ -1,0 +1,45 @@
+{
+  "Comment": "VinciFlow Content Generation Pipeline",
+  "StartAt": "ParseIntent",
+  "States": {
+    "ParseIntent": {
+      "Type": "Task",
+      "Resource": "${arn_lambda_intent_parser}",
+      "Next": "ProcessPosts"
+    },
+    "ProcessPosts": {
+      "Type": "Map",
+      "ItemsPath": "$.posts",
+      "MaxConcurrency": 5,
+      "Iterator": {
+        "StartAt": "GenerateContent",
+        "States": {
+          "GenerateContent": {
+            "Type": "Task",
+            "Resource": "${arn_lambda_generator}",
+            "Retry": [
+              {
+                "ErrorEquals": ["Lambda.TooManyRequestsException", "ServiceException"],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 3,
+                "BackoffRate": 2.0
+              }
+            ],
+            "Next": "ApplyBranding"
+          },
+          "ApplyBranding": {
+            "Type": "Task",
+            "Resource": "${arn_lambda_branding}",
+            "Next": "StoreDraft"
+          },
+          "StoreDraft": {
+            "Type": "Task",
+            "Resource": "${arn_lambda_storage}",
+            "End": true
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}

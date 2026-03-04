@@ -10,11 +10,11 @@ const Onboarding: React.FC = () => {
     // FIX: Match DynamoDB and Interface exactly
     BrandName: '',
     Industry: 'SaaS',
-    Region: 'India',
+  Region: 'India',
     Tone: '', 
     Colors: ['#8E75C2'],
     Platforms: ['Instagram'],
-    LogoUrl: '' 
+    LogoUrl: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
