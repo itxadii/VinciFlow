@@ -22,7 +22,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         {/* File Preview Bubble */}
         {selectedFile && (
           <div className="absolute -top-10 left-4 flex items-center gap-2 bg-white text-slate-600 px-3 py-1 rounded-xl text-xs border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-2">
-            <span className="truncate max-w-[150px]">📎 {selectedFile.name}</span>
+            <span className="truncate max-w-37.5">📎 {selectedFile.name}</span>
             <button type="button" onClick={() => setSelectedFile(null)} className="font-bold hover:text-red-500">×</button>
           </div>
         )}

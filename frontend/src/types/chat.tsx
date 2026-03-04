@@ -12,6 +12,7 @@ export interface ChatResponse {
   response: string; 
   sessionId: string;
   status?: 'success' | 'error';
+  message?: string
 }
 
 // 2. Multimodal Payload for Nova Lite

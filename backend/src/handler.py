@@ -10,6 +10,7 @@ import traceback
 import requests 
 from decimal import Decimal
 from boto3.dynamodb.conditions import Key, Attr
+import google.generativeai as genai
 
 # --- Configuration ---
 AGENT_ID = os.environ.get('BEDROCK_AGENT_ID', 'Y65UM8CFJP') 
@@ -50,6 +51,15 @@ def get_cors_headers(event):
         'Content-Type': 'application/json'
     }
 
+def get_gemini_key():
+    param_path = "/corex/gemini_api_key" #
+    try:
+        res = ssm_client.get_parameter(Name=param_path, WithDecryption=True)
+        return res['Parameter']['Value'] # Value: AlzaSyBAE8YIH...
+    except Exception as e:
+        print(f"ERROR | Gemini Key Fetch Failed: {str(e)}")
+        return None
+    
 def get_user_id(event):
     try:
         claims = event.get('requestContext', {}).get('authorizer', {}).get('jwt', {}).get('claims', {})
@@ -70,10 +80,107 @@ def get_state_machine_arn():
         return None
 
 def handler(event, context):
-    # --- 1. IMMEDIATE CORS & SFN ROUTING ---
+    # --- 1. STEP FUNCTION TASK ROUTING ---
     if "requestContext" not in event:
-        print("DEBUG | SFN Task Triggered | Event:", json.dumps(event))
-        return {"status": "success", "data": "Internal SFN Task Processed"}
+        # SFN input se task, ids aur contexts fetch karna
+        task = event.get('task', 'PARSE')
+        user_id = event.get('userId')
+        session_id = event.get('sessionId')
+        user_prompt = event.get('prompt', '')
+        brand_ctx = event.get('brandContext', {})
+        
+        # Configure Gemini using SSM Key
+        api_key = get_gemini_key()
+        genai.configure(api_key=api_key)
+
+        # --- TASK A: PARSE (Dynamic Intent Extraction) ---
+        if task == "PARSE":
+            # Bedrock Nova-Lite is best for JSON extraction
+            parsing_instr = """
+            Extract social media posts. Return ONLY valid JSON: {"posts": [{"date": "YYYY-MM-DD", "topic": "...", "type": "IMAGE"}]}.
+            Year: 2026. Identify specific dates.
+            """
+            response = bedrock_runtime.converse(
+                modelId="us.amazon.nova-lite-v1:0",
+                messages=[{"role": "user", "content": [{"text": f"{parsing_instr}\nPrompt: {user_prompt}"}]}]
+            )
+            try:
+                llm_out = response['output']['message']['content'][0]['text']
+                parsed_data = json.loads(llm_out[llm_out.find('{'):llm_out.rfind('}')+1])
+            except:
+                parsed_data = {"posts": []}
+
+            # Return 'posts' array to fuel SFN Map State
+            return {
+                "posts": parsed_data.get('posts', []),
+                "userId": user_id, 
+                "sessionId": session_id,
+                "brandContext": brand_ctx, 
+                "prompt": user_prompt,
+                "task": "GENERATE"
+            }
+
+        # --- TASK B: GENERATE (Content Generation) ---
+        if task == "GENERATE":
+            topic = event.get('topic')
+            date = event.get('date')
+            
+            # Dynamic variables from brandContext
+            brand_name = brand_ctx.get('name', 'Global Brand')
+            industry = brand_ctx.get('industry', 'Lifestyle')
+            tone = brand_ctx.get('tone', 'Professional')
+
+            model = genai.GenerativeModel('gemini-2.5-flash') #
+            
+            # 🚀 Dynamic Multi-Brand Prompt
+            prompt = f"""
+            Act as the Head of Social Media for {brand_name} in the {industry} industry. 
+            Your brand tone is {tone}.
+            
+            Task: Create a viral social media caption and 5 trending hashtags for: "{topic}" 
+            Scheduled Date: {date}.
+            
+            Format your response clearly:
+            Caption: [High-quality text in {tone} tone]
+            Hashtags: #Tag1 #Tag2 ...
+            """
+            
+            try:
+                response = model.generate_content(prompt)
+                # Passing content to 'BRAND' task for final check
+                return {**event, "rawContent": response.text, "task": "BRAND"}
+            except Exception as e:
+                print(f"ERROR | Gemini call failed: {str(e)}")
+                return {"status": "error", "message": str(e)}
+
+        # --- TASK C: BRAND (Branding Refinement) ---
+        if task == "BRAND":
+            # Apply brand tone and industrial context
+            tone = brand_ctx.get('tone', 'Bold')
+            raw = event.get('rawContent')
+            final_content = f"[{tone} Mode] {raw} #JustDoIt"
+            return {**event, "finalContent": final_content, "task": "STORE"}
+
+        # --- TASK D: STORE (Unified Memory Save) ---
+        if task == "STORE":
+            table = dynamodb_resource.Table(TABLE_NAME) # vinciflow-dev-memory
+            # Save so it appears in Sidebar Recent History
+            table.put_item(Item={
+                'UserId': user_id,
+                'Timestamp': int(time.time()),
+                'SessionId': session_id,
+                'UserMessage': f"📅 Scheduled Flow: {event.get('date')}", 
+                'AgentResponse': event.get('finalContent'),
+                'ScheduledDate': event.get('date'),
+                'Status': 'DRAFT' # Ready for Accept/Reject on frontend
+            })
+            return {"status": "success"}
+
+    # --- 2. EXISTING API GATEWAY LOGIC (UNTOUCHED) ---
+    method = event.get('requestContext', {}).get('http', {}).get('method') or event.get('httpMethod')
+    path = event.get('rawPath') or event.get('path') or '/' 
+    print(f"DEBUG | method={method} path={path}") 
+    cors_headers = get_cors_headers(event)
 
     # Fix: 'path' ko yahan define kar diya taaki print crash na ho
     method = event.get('requestContext', {}).get('http', {}).get('method') or event.get('httpMethod')
@@ -150,7 +257,7 @@ def handler(event, context):
         if path == "/" or path == "":
             if method == 'GET':
                 table = dynamodb_resource.Table(TABLE_NAME)
-                response = table.query(KeyConditionExpression=Key('UserId').eq(user_id), ScanIndexForward=False, Limit=50)
+                response = table.query(KeyConditionExpression=Key('UserId').eq(user_id), ScanIndexForward=True, Limit=50)
                 return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'history': response.get('Items', [])}, cls=DecimalEncoder)}
 
             elif method == 'POST':

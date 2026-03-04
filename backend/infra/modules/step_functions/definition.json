@@ -1,5 +1,5 @@
 {
-  "Comment": "VinciFlow Content Generation Pipeline",
+  "Comment": "VinciFlow Content Generation Pipeline - Fixed Context Flow",
   "StartAt": "ParseIntent",
   "States": {
     "ParseIntent": {
@@ -10,6 +10,16 @@
     "ProcessPosts": {
       "Type": "Map",
       "ItemsPath": "$.posts",
+      "ItemSelector": {
+        "topic.$": "$$.Map.Item.Value.topic",
+        "date.$": "$$.Map.Item.Value.date",
+        "type.$": "$$.Map.Item.Value.type",
+        "userId.$": "$.userId",
+        "sessionId.$": "$.sessionId",
+        "brandContext.$": "$.brandContext",
+        "prompt.$": "$.prompt",
+        "task": "GENERATE" 
+      },
       "MaxConcurrency": 5,
       "Iterator": {
         "StartAt": "GenerateContent",
