@@ -172,7 +172,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
         )}
 
         {messages.length === 0 && !isLoading && (
-          <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center w-full z-0 px-6">
+          <div className="absolute top-[50%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center w-full z-0 px-6">
              <h1 className="text-5xl md:text-6xl font-['Merriweather'] font-bold text-slate-800 mb-6 tracking-tight">
                Back at it, <span className="font-['Handlee'] text-slate-600">{user?.signInDetails?.loginId?.split('@')[0] || "Aditya"}</span>
              </h1>
