@@ -12,7 +12,7 @@ interface MessageListProps {
 const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, scrollRef }) => {
   return (
     <main className="flex-1 overflow-y-auto p-4 md:px-24 space-y-10 custom-scrollbar z-10">
-      <div className="max-w-4xl mx-auto space-y-10 pt-10">
+      <div className="max-w-4xl mx-auto space-y-10">
         
         {/* 1. Empty State with Branding Fonts */}
         {messages.length === 0 && !isLoading && (
