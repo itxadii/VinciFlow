@@ -17,7 +17,7 @@ const Navbar = () => {
     
     <div className="fixed w-full top-6 z-50 px-4 flex justify-center bg-yellow">
       {/* Main Island Container */}
-      <nav className={`w-full max-w-5xl bg-white/70 backdrop-blur-xl border border-gray-500 shadow-xl transition-all duration-300 bg-white ${isOpen ? 'rounded-3xl' : 'rounded-full'}`}>
+      <nav className={`w-full max-w-5xl backdrop-blur-xl border border-gray-500 shadow-xl transition-all duration-300 bg-white ${isOpen ? 'rounded-3xl' : 'rounded-full'}`}>
         <div className="px-6 py-3">
           <div className="flex justify-between items-center">
             <Link to="/" className="flex items-center gap-2">
@@ -39,7 +39,7 @@ const Navbar = () => {
                   {link.name}
                 </Link>
               ))}
-              <div className="h-6 w-[1px] bg-gray-300 mx-2" />
+              <div className="h-6 w-px bg-gray-300 mx-2" />
               <span className="font-['Handlee']">
               <button onClick={() => navigate('/login')} className="text-sm font-bold text-slate-700 hover:text-slate-900">
                 Log in
