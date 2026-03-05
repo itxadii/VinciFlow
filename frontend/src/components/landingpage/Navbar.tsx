@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react'; // Icons for better mobile UI
-import logo from "../../assets/vinciflow.jpg";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,7 +20,6 @@ const Navbar = () => {
         <div className="px-6 py-3">
           <div className="flex justify-between items-center">
             <Link to="/" className="flex items-center gap-2">
-              <img src={logo} alt="VinciFlow" className="h-10 w-10 rounded-full" />
   
             <span className="text-2xl font-bold text-slate-900 font-['Handlee']">
               VinciFlow

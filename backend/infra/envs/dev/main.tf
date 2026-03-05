@@ -43,6 +43,16 @@ module "iam" {
   agent_role_arn = module.bedrock_agent.agent_role_arn 
 }
 
+module "brand_assets_s3" {
+  source      = "../../modules/s3"
+  bucket_name = "vinciflow-${var.env}-brand-assets"
+  env         = var.env
+  tags = {
+    Project = "VinciFlow"
+    Owner   = "Aditya"
+  }
+}
+
 module "api_gateway" {
   source                      = "../../modules/api_gateway"
   env                         = var.env
