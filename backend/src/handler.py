@@ -82,6 +82,41 @@ def get_state_machine_arn():
     except Exception as e:
         print(f"ERROR | SSM ARN Fetch Failed: {str(e)}")
         return None
+    
+def refresh_x_token(user_id, refresh_token):
+    """X API OAuth 2.0 Refresh Token Logic"""
+    print(f"DEBUG | Refreshing token for user: {user_id}")
+    
+    # Client ID aur Secret Basic Auth ke liye
+    auth_b64 = base64.b64encode(f"{X_CLIENT_ID}:{X_CLIENT_SECRET}".encode()).decode()
+    
+    headers = {
+        "Authorization": f"Basic {auth_b64}",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    
+    data = {
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token",
+        "client_id": X_CLIENT_ID
+    }
+    
+    response = requests.post("https://api.twitter.com/2/oauth2/token", headers=headers, data=data)
+    
+    if response.status_code == 200:
+        new_tokens = response.json()
+        dynamodb_resource.Table(BRANDS_TABLE).update_item(
+            Key={'UserId': user_id},
+            UpdateExpression="SET x_access_token = :at, x_refresh_token = :rt",
+            ExpressionAttributeValues={
+                ':at': new_tokens['access_token'],
+                ':rt': new_tokens['refresh_token'] # X rotates this too!
+            }
+        )
+        return new_tokens['access_token']
+    else:
+        print(f"ERROR | Refresh Failed: {response.text}")
+        return None
 
 def handler(event, context):
     # --- 1. STEP FUNCTION TASK ROUTING ---
@@ -94,36 +129,69 @@ def handler(event, context):
         brand_ctx = event.get('brandContext', {})
         timestamp = event.get('timestamp')
 
+        # --- TASK: PUBLISH_X (Scheduled Execution with Auto-Refresh) ---
         if task == "PUBLISH_X":
             print(f"DEBUG | Scheduled Execution for User: {user_id} | Post: {timestamp}")
             try:
-                # 1. Fetch Fresh Tokens from Brands Table
+                # 1. Fetch Tokens & Content
                 brands_table = dynamodb_resource.Table(BRANDS_TABLE)
                 brand_data = brands_table.get_item(Key={'UserId': user_id}).get('Item', {})
+                
                 access_token = brand_data.get('x_access_token')
+                refresh_token = brand_data.get('x_refresh_token')
 
-                # 2. Fetch Content from Memory Table
                 memory_table = dynamodb_resource.Table(TABLE_NAME)
                 post_data = memory_table.get_item(Key={'UserId': user_id, 'Timestamp': int(timestamp)}).get('Item', {})
                 caption = post_data.get('AgentResponse', 'VinciFlow Auto-Post')
 
-                if not access_token:
-                    print(f"ERROR | No X tokens for user {user_id}")
-                    return {"status": "error", "message": "Missing tokens"}
+                # Helper: Tweet Posting Logic
+                def post_tweet(token):
+                    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+                    return requests.post("https://api.twitter.com/2/tweets", headers=headers, json={"text": caption})
 
-                # 3. Execute Post to X (Twitter) API v2
-                headers = {
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json"
-                }
-                x_resp = requests.post(
-                    "https://api.twitter.com/2/tweets",
-                    headers=headers,
-                    json={"text": caption}
-                )
+                # 2. First Attempt to Post
+                x_resp = post_tweet(access_token)
+                print(f"DEBUG | Initial Attempt Status: {x_resp.status_code}")
+
+                # 3. IF UNAUTHORIZED (401): Refresh and Retry
+                if x_resp.status_code == 401 and refresh_token:
+                    print("DEBUG | Token expired. Attempting refresh...")
+                    
+                    # OAuth 2.0 Refresh Call
+                    auth_b64 = base64.b64encode(f"{X_CLIENT_ID}:{X_CLIENT_SECRET}".encode()).decode()
+                    token_url = "https://api.twitter.com/2/oauth2/token"
+                    refresh_data = {
+                        "refresh_token": refresh_token,
+                        "grant_type": "refresh_token",
+                        "client_id": X_CLIENT_ID
+                    }
+                    
+                    refresh_resp = requests.post(token_url, headers={"Authorization": f"Basic {auth_b64}"}, data=refresh_data)
+                    
+                    if refresh_resp.status_code == 200:
+                        new_tokens = refresh_resp.json()
+                        access_token = new_tokens['access_token']
+                        
+                        # 🚀 Update DB with BOTH new tokens (Rotation)
+                        brands_table.update_item(
+                            Key={'UserId': user_id},
+                            UpdateExpression="SET x_access_token = :at, x_refresh_token = :rt",
+                            ExpressionAttributeValues={
+                                ':at': access_token,
+                                ':rt': new_tokens['refresh_token']
+                            }
+                        )
+                        
+                        # Retry Posting
+                        x_resp = post_tweet(access_token)
+                        print(f"DEBUG | Retry Attempt Status: {x_resp.status_code}")
+                    else:
+                        print(f"ERROR | Refresh Failed: {refresh_resp.text}")
+
+                # 4. Final Result Handling
+                print(f"X API Response Body: {x_resp.text}")
 
                 if x_resp.status_code == 201:
-                    # 4. Update Status to PUBLISHED
                     memory_table.update_item(
                         Key={'UserId': user_id, 'Timestamp': int(timestamp)},
                         UpdateExpression="SET #s = :s, TweetId = :tid",
@@ -132,8 +200,7 @@ def handler(event, context):
                     )
                     return {"status": "success", "tweetId": x_resp.json()['data']['id']}
                 
-                print(f"ERROR | X API: {x_resp.text}")
-                return {"status": "error", "details": x_resp.json()}
+                return {"status": "error", "details": x_resp.text}
 
             except Exception as e:
                 traceback.print_exc()
@@ -147,38 +214,74 @@ def handler(event, context):
         if task == "PARSE":
             # 1. Fetch Session Context (Pichli 5 baatein)
             memory_table = dynamodb_resource.Table(TABLE_NAME)
-            history = memory_table.query(
+            
+            # Hum UserId (PK) use karenge aur SessionId par filter lagayenge
+            response = memory_table.query(
                 KeyConditionExpression=Key('UserId').eq(user_id),
-                ScanIndexForward=False,
-                Limit=5
-            ).get('Items', [])
+                FilterExpression=Attr('SessionId').eq(session_id), 
+                ScanIndexForward=False, # Latest first
+                Limit=50
+            )
+            history = response.get('Items', [])[:5]
             
             # Context ko string mein convert karein
-            context_str = "\n".join([f"User: {h['UserMessage']}\nAgent: {h.get('AgentResponse', '')}" for h in reversed(history)])
+            context_str = "\n".join([
+                f"User: {h['UserMessage']}\nAgent: {h.get('AgentResponse', '')}" 
+                for h in reversed(history)
+            ])
             current_time = time.strftime("%Y-%m-%dT%H:%M:%S")
 
             # 2. Nova-Lite: The Brain
             synthesis_instr = f"""
-            System Time: {current_time}. Year: 2026.
-            Role: Social Media Architect.
-            
-            Analyze Context and Current Prompt.
-            1. Identify the TOPIC (e.g., Diwali Discount).
-            2. Identify the SCHEDULE (ISO Format: YYYY-MM-DDTHH:mm:ss).
-            
-            If SCHEDULE is missing, set "status": "NEED_TIME".
-            If both are present, synthesize a "FinalPrompt" for content generation.
-            
-            Return ONLY JSON:
+            System Time: {current_time}
+            System Timezone: Indian Standard Time (IST) UTC+05:30
+            Year: 2026
+
+            Role: Social Media Architect & Scheduling Interpreter.
+
+            Your job is to analyze the user's message and extract:
+            1. TOPIC of the content (campaign, promotion, festival, announcement, etc.)
+            2. SCHEDULE time.
+
+            STRICT RULES FOR SCHEDULE:
+            - All schedules MUST be returned in ISO-8601 format.
+            - Format: YYYY-MM-DDTHH:mm:ss
+            - Time MUST be in Indian Standard Time (IST).
+            - Do NOT convert to UTC.
+            - Do NOT append timezone offsets.
+            - Convert any user time (AM/PM or natural language) into 24-hour format.
+            - Example:
+                6 March 2026 9:51 PM → 2026-03-06T21:51:00
+                March 7 at 3:21 AM → 2026-03-07T03:21:00
+
+            LOGIC:
+            1. Detect the campaign/topic from the user input.
+            2. Detect any date and time expressions.
+            3. Normalize them into ISO format using IST.
+            4. If date OR time is missing → status = NEED_TIME.
+            5. If both topic and schedule exist → generate FinalPrompt.
+
+            FinalPrompt must instruct a content generator to create:
+            - platform-ready social media content
+            - captions
+            - hashtags
+            - CTA
+            - tone aligned with the topic
+
+            OUTPUT RULES:
+            - Return ONLY valid JSON.
+            - No explanations.
+            - No extra text.
+
+            JSON FORMAT:
             {{
                 "status": "READY" | "NEED_TIME",
                 "topic": "...",
                 "schedule": "YYYY-MM-DDTHH:mm:ss",
-                "finalPrompt": "Detailed AI instructions for content generation...",
-                "askUser": "Message if info is missing"
+                "finalPrompt": "...",
+                "askUser": "If schedule missing ask for exact date and time in IST"
             }}
             """
-            
             response = bedrock_runtime.converse(
                 modelId="us.amazon.nova-lite-v1:0",
                 messages=[{"role": "user", "content": [{"text": f"{synthesis_instr}\nContext:\n{context_str}\n\nCurrent Prompt: {user_prompt}"}]}]
@@ -299,7 +402,7 @@ def handler(event, context):
                     UpdateExpression="SET x_code_verifier = :cv, x_state = :st",
                     ExpressionAttributeValues={':cv': code_verifier, ':st': state}
                 )
-                auth_url = f"https://twitter.com{X_CLIENT_ID}&redirect_uri={X_REDIRECT_URI}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state={state}&code_challenge={code_challenge}&code_challenge_method=s256"
+                auth_url = f"https://twitter.com/i/oauth2/authorize?response_type=code&client_id={X_CLIENT_ID}&redirect_uri={X_REDIRECT_URI}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state={state}&code_challenge={code_challenge}&code_challenge_method=s256"
                 return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'authUrl': auth_url})}
 
             if method == "POST" and "/callback" in path:
@@ -338,9 +441,8 @@ def handler(event, context):
             scheduler_client.create_schedule(
                 Name=f"VF-Post-{user_id[:8]}-{post_id}",
                 ScheduleExpression=f"at({target_time})",
-                FlexibleTimeWindow={
-                    'Mode': 'OFF'
-                },
+                FlexibleTimeWindow={'Mode': 'OFF'},
+                ScheduleExpressionTimezone="Asia/Kolkata",
                 Target={
                     'Arn': context.invoked_function_arn, # Ye Lambda khud ko wapas call karegi
                     'RoleArn': SCHEDULER_ROLE_ARN,

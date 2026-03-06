@@ -40,7 +40,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ image, content, hashtags, onAcc
           </div>
         ) : (
           <div className="pt-2 text-center py-2 bg-slate-100 rounded-xl text-slate-400 text-xs font-bold flex items-center justify-center gap-2">
-            <Clock size={14} /> Waiting for Trigger...
+            <Clock size={14} /> SCHEDULED
           </div>
         )}
       </div>
