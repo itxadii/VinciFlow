@@ -1,24 +1,20 @@
 import { apiClient } from './api';
 
-/**
- * VinciFlow Brand Profile Interface
- * Tone is now a long string to allow for detailed brand "Aura" synthesis.
- */
+// brandApi.ts mein interface update karein
 export interface BrandProfile {
-  // --- Mandatory (v1) ---
-  brandName: string;
-  industry: string;               // User defined (e.g., "AI-SaaS", "Sustainable Fashion")
-  region: string;                 // User choice (e.g., "India", "North America")
-  tone: string;                   // Long defined string (e.g., "Witty yet professional")
-  logoUrl: string;                // S3 path for the brand logo
-  colors: string[];               // Array of hex codes
-  platforms: string[];            // Default V1: ["Instagram"]
-
-  // --- Optional (v1.5) ---
-  targetAudience?: string;
-  doWords?: string[];             // Preferred vocabulary
-  dontWords?: string[];           // Forbidden vocabulary
-  competitors?: string[];
+  // DynamoDB ke PascalCase se match hona chahiye
+  BrandName: string;
+  Industry: string;
+  Region: string;
+  Tone: string;
+  LogoUrl: string;
+  Colors: string[];
+  Platforms: string[];
+  
+  // Optional fields (V1.5)
+  TargetAudience?: string;
+  DoWords?: string[];
+  DontWords?: string[];
 }
 
 /**

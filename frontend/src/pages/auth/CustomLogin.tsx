@@ -3,7 +3,7 @@ import { signIn, getCurrentUser } from 'aws-amplify/auth';
 import { useNavigate, Link } from 'react-router-dom';
 import FloatingIcons from '../../components/FloatingIcons';
 // Import the brand check function
-import { getBrandProfile } from '../../services/brandApi';
+// import { getBrandProfile } from '../../services/brandApi';
 
 export default function CustomLogin() {
   const [email, setEmail] = useState('');
@@ -13,24 +13,23 @@ export default function CustomLogin() {
   const navigate = useNavigate();
 
   // 1. Unified Navigation Logic
-  const navigateBasedOnBrand = async () => {
-    try {
-      const brandData = await getBrandProfile();
-      
-      // Check if brandData is truly empty OR backend returned 404
-      if (brandData && brandData.brandName) {
-        navigate('/chat', { replace: true });
-      } else {
-        // Agar aap developer ho aur seedha chat test karna chahte ho:
-        console.log("No brand found, staying on login or moving to onboarding");
-        navigate('/onboarding', { replace: true }); 
-      }
-    } catch (err) {
-      // Agar API hi 404 de rahi hai (jo ki empty DB mein normal hai)
-      console.warn("Brand not found, user is likely new.");
+const navigateBasedOnBrand = async () => {
+  // --- DEV BYPASS: Seedha chat par bhejo ---
+  navigate('/chat', { replace: true }); 
+  
+  /* // Prod logic (Baad mein use karna jab data fill kar lo)
+  try {
+    const brandData = await getBrandProfile();
+    if (brandData && brandData.BrandName) {
+      navigate('/chat', { replace: true });
+    } else {
       navigate('/onboarding', { replace: true });
     }
-  };
+  } catch (err) {
+    navigate('/onboarding', { replace: true });
+  }
+  */
+};
 
   // 2. Auto-login check
   useEffect(() => {

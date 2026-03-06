@@ -43,3 +43,6 @@ output "vinciflow_agent_arn" {
   description = "The ARN of the Bedrock Agent"
   value       = module.bedrock_agent.agent_arn
 }
+output "lambda_role_arn" {
+  value = module.iam.lambda_role_arn  
+}

@@ -35,10 +35,24 @@ export const sendMessageToBackend = async (payload: ChatRequest): Promise<ChatRe
   return response.data;
 };
 
+export const updateFlowStatus = async (timestamp: number, sessionId: string, status: 'SCHEDULED' | 'REJECTED'): Promise<any> => {
+  try {
+    const response = await apiClient.post('/schedule', {
+      timestamp, // Primary key identifier
+      sessionId,
+      status     // New status to update in DynamoDB
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error updating flow status:", error);
+    throw error;
+  }
+};
+
 export const getChatHistory = async (): Promise<any[]> => {
   try {
     const response = await apiClient.get('/'); 
-    return response.data.history; // Backend returns { history: [...] }
+    return response.data.history; 
   } catch (error) {
     console.error("Error fetching history:", error);
     throw error;
