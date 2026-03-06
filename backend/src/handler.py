@@ -20,14 +20,18 @@ BRANDS_TABLE = os.environ.get('BRANDS_TABLE_NAME')
 X_CLIENT_ID = os.environ.get('X_CLIENT_ID')
 X_CLIENT_SECRET = os.environ.get('X_CLIENT_SECRET')
 X_REDIRECT_URI = "https://dev.d8aheoykcvs8k.amplifyapp.com" 
+ASSETS_BUCKET = os.environ.get('ASSETS_BUCKET_NAME', 'vinciflow-dev-assets') 
+SCHEDULER_ROLE_ARN = os.environ.get('SCHEDULER_ROLE_ARN')
 ENV = os.environ.get('ENV', 'dev')
 
 # --- CLIENTS ---
+s3_client = boto3.client('s3', region_name="ap-south-1")
 bedrock_runtime = boto3.client('bedrock-runtime', region_name="us-east-1")
 agent_client = boto3.client('bedrock-agent-runtime', region_name="ap-south-1") 
 dynamodb_resource = boto3.resource('dynamodb', region_name="ap-south-1")
 sfn_client = boto3.client('stepfunctions', region_name="ap-south-1")
 ssm_client = boto3.client('ssm', region_name="ap-south-1")
+scheduler_client = boto3.client('scheduler', region_name="ap-south-1") #
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -88,6 +92,52 @@ def handler(event, context):
         session_id = event.get('sessionId')
         user_prompt = event.get('prompt', '')
         brand_ctx = event.get('brandContext', {})
+        timestamp = event.get('timestamp')
+
+        if task == "PUBLISH_X":
+            print(f"DEBUG | Scheduled Execution for User: {user_id} | Post: {timestamp}")
+            try:
+                # 1. Fetch Fresh Tokens from Brands Table
+                brands_table = dynamodb_resource.Table(BRANDS_TABLE)
+                brand_data = brands_table.get_item(Key={'UserId': user_id}).get('Item', {})
+                access_token = brand_data.get('x_access_token')
+
+                # 2. Fetch Content from Memory Table
+                memory_table = dynamodb_resource.Table(TABLE_NAME)
+                post_data = memory_table.get_item(Key={'UserId': user_id, 'Timestamp': int(timestamp)}).get('Item', {})
+                caption = post_data.get('AgentResponse', 'VinciFlow Auto-Post')
+
+                if not access_token:
+                    print(f"ERROR | No X tokens for user {user_id}")
+                    return {"status": "error", "message": "Missing tokens"}
+
+                # 3. Execute Post to X (Twitter) API v2
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json"
+                }
+                x_resp = requests.post(
+                    "https://api.twitter.com/2/tweets",
+                    headers=headers,
+                    json={"text": caption}
+                )
+
+                if x_resp.status_code == 201:
+                    # 4. Update Status to PUBLISHED
+                    memory_table.update_item(
+                        Key={'UserId': user_id, 'Timestamp': int(timestamp)},
+                        UpdateExpression="SET #s = :s, TweetId = :tid",
+                        ExpressionAttributeNames={'#s': 'Status'},
+                        ExpressionAttributeValues={':s': 'PUBLISHED', ':tid': x_resp.json()['data']['id']}
+                    )
+                    return {"status": "success", "tweetId": x_resp.json()['data']['id']}
+                
+                print(f"ERROR | X API: {x_resp.text}")
+                return {"status": "error", "details": x_resp.json()}
+
+            except Exception as e:
+                traceback.print_exc()
+                return {"status": "error", "message": str(e)}
         
         # Configure Gemini using SSM Key
         api_key = get_gemini_key()
@@ -95,31 +145,73 @@ def handler(event, context):
 
         # --- TASK A: PARSE (Dynamic Intent Extraction) ---
         if task == "PARSE":
-            # Bedrock Nova-Lite is best for JSON extraction
-            parsing_instr = """
-            Extract social media posts. Return ONLY valid JSON: {"posts": [{"date": "YYYY-MM-DD", "topic": "...", "type": "IMAGE"}]}.
-            Year: 2026. Identify specific dates.
+            # 1. Fetch Session Context (Pichli 5 baatein)
+            memory_table = dynamodb_resource.Table(TABLE_NAME)
+            history = memory_table.query(
+                KeyConditionExpression=Key('UserId').eq(user_id),
+                ScanIndexForward=False,
+                Limit=5
+            ).get('Items', [])
+            
+            # Context ko string mein convert karein
+            context_str = "\n".join([f"User: {h['UserMessage']}\nAgent: {h.get('AgentResponse', '')}" for h in reversed(history)])
+            current_time = time.strftime("%Y-%m-%dT%H:%M:%S")
+
+            # 2. Nova-Lite: The Brain
+            synthesis_instr = f"""
+            System Time: {current_time}. Year: 2026.
+            Role: Social Media Architect.
+            
+            Analyze Context and Current Prompt.
+            1. Identify the TOPIC (e.g., Diwali Discount).
+            2. Identify the SCHEDULE (ISO Format: YYYY-MM-DDTHH:mm:ss).
+            
+            If SCHEDULE is missing, set "status": "NEED_TIME".
+            If both are present, synthesize a "FinalPrompt" for content generation.
+            
+            Return ONLY JSON:
+            {{
+                "status": "READY" | "NEED_TIME",
+                "topic": "...",
+                "schedule": "YYYY-MM-DDTHH:mm:ss",
+                "finalPrompt": "Detailed AI instructions for content generation...",
+                "askUser": "Message if info is missing"
+            }}
             """
+            
             response = bedrock_runtime.converse(
                 modelId="us.amazon.nova-lite-v1:0",
-                messages=[{"role": "user", "content": [{"text": f"{parsing_instr}\nPrompt: {user_prompt}"}]}]
+                messages=[{"role": "user", "content": [{"text": f"{synthesis_instr}\nContext:\n{context_str}\n\nCurrent Prompt: {user_prompt}"}]}]
             )
+
             try:
                 llm_out = response['output']['message']['content'][0]['text']
-                parsed_data = json.loads(llm_out[llm_out.find('{'):llm_out.rfind('}')+1])
+                parsed = json.loads(llm_out[llm_out.find('{'):llm_out.rfind('}')+1])
             except:
-                parsed_data = {"posts": []}
+                parsed = {"status": "NEED_TIME", "askUser": "Bhai, pichli baat samajh nahi aayi. Kab schedule karna hai?"}
 
-            # Return 'posts' array to fuel SFN Map State
+            # 3. Decision Logic
+            if parsed.get('status') == "NEED_TIME":
+                # Save current intent so we don't forget it in next turn
+                return {
+                    "task": "AWAIT_CLARIFICATION", 
+                    "message": parsed.get('askUser', "Please specify date and time to schedule."),
+                    "userId": user_id, "sessionId": session_id
+                }
+
+            # 4. Success: Feeding synthesized prompt to GENERATE
             return {
-                "posts": parsed_data.get('posts', []),
                 "userId": user_id, 
                 "sessionId": session_id,
                 "brandContext": brand_ctx, 
-                "prompt": user_prompt,
+                "prompt": parsed.get('finalPrompt'),
+                "posts": [{
+                    "date": parsed.get('schedule'),
+                    "topic": parsed.get('topic'),
+                    "type": "IMAGE"
+                }],
                 "task": "GENERATE"
             }
-
         # --- TASK B: GENERATE (Content Generation) ---
         if task == "GENERATE":
             topic = event.get('topic')
@@ -179,10 +271,6 @@ def handler(event, context):
     path = event.get('rawPath') or event.get('path') or '/' 
     print(f"DEBUG | method={method} path={path}") 
     cors_headers = get_cors_headers(event)
-
-    # Fix: 'path' ko yahan define kar diya taaki print crash na ho
-    method = event.get('requestContext', {}).get('http', {}).get('method') or event.get('httpMethod')
-    path = event.get('rawPath') or event.get('path') or '/' 
     
     # Ab ye line perfectly kaam karegi
     print(f"DEBUG | method={method} path={path}") 
@@ -229,28 +317,95 @@ def handler(event, context):
                     return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'message': 'X successfully linked!'})}
                 return {'statusCode': 400, 'headers': cors_headers, 'body': json.dumps({'error': tokens})}
 
-        # --- 3. BRAND PROFILE & ONBOARDING ---
-        if "/brand" in path or "/onboarding" in path:
+        # --- Updated Consolidated Route Logic ---
+
+        normalized_path = path.strip('/') 
+
+        if normalized_path == "schedule" and method == "POST":
+            body = json.loads(event.get('body', '{}'))
+            post_id = int(body.get('timestamp'))
+            target_time = body.get('scheduledTime') # Format: 2026-03-07T10:00:00
+
+            # 1. Update Status to SCHEDULED in Memory Table
+            dynamodb_resource.Table(TABLE_NAME).update_item(
+                Key={'UserId': user_id, 'Timestamp': post_id},
+                UpdateExpression="SET #s = :s, ScheduledTime = :st",
+                ExpressionAttributeNames={'#s': 'Status'},
+                ExpressionAttributeValues={':s': 'SCHEDULED', ':st': target_time}
+            )
+
+            # 2. Create EventBridge One-Time Schedule
+            scheduler_client.create_schedule(
+                Name=f"VF-Post-{user_id[:8]}-{post_id}",
+                ScheduleExpression=f"at({target_time})",
+                FlexibleTimeWindow={
+                    'Mode': 'OFF'
+                },
+                Target={
+                    'Arn': context.invoked_function_arn, # Ye Lambda khud ko wapas call karegi
+                    'RoleArn': SCHEDULER_ROLE_ARN,
+                    'Input': json.dumps({
+                        'userId': user_id,
+                        'timestamp': post_id,
+                        'task': 'PUBLISH_X' # Internal trigger task
+                    })
+                },
+                ActionAfterCompletion='DELETE'
+            )
+            return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'message': 'Scheduled!'})}
+
+        if normalized_path in ["brand", "onboarding"]:
             table = dynamodb_resource.Table(BRANDS_TABLE)
-            if method == 'POST':
+            
+            # --- GET: Profile Fetch (Breaking the Onboarding Loop) ---
+            if method == 'GET':
+                response = table.get_item(Key={'UserId': user_id})
+                item = response.get('Item')
+                
+                if not item:
+                    # Frontend is data ke base par decide karta hai ki onboarding dikhani hai ya nahi
+                    return {'statusCode': 404, 'headers': cors_headers, 'body': json.dumps({'error': 'Profile not found'})}
+                
+                return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps(item, cls=DecimalEncoder)}
+
+            # --- POST: Logo Upload & Profile Save ---
+            elif method == 'POST':
                 body = json.loads(event.get('body', '{}'))
+                logo_url = body.get('logoUrl') 
+                
+                # S3 Logo Logic
+                if body.get('logoBase64'):
+                    try:
+                        logo_content = base64.b64decode(body['logoBase64'].split(',')[-1])
+                        content_type = body.get('contentType', 'image/svg+xml')
+                        ext = 'svg' if 'svg' in content_type else 'jpg'
+                        s3_key = f"logos/{user_id}_logo.{ext}"
+                        
+                        s3_client.put_object(
+                            Bucket=ASSETS_BUCKET,
+                            Key=s3_key,
+                            Body=logo_content,
+                            ContentType=content_type
+                        )
+                        logo_url = f"https://{ASSETS_BUCKET}.s3.amazonaws.com/{s3_key}"
+                    except Exception as e:
+                        print(f"ERROR | Logo S3 Upload Failed: {str(e)}")
+
+                # DynamoDB Save
                 brand_item = {
                     'UserId': user_id,
                     'BrandName': body.get('brandName') or body.get('BrandName'),
                     'Industry': body.get('industry') or body.get('Industry'),
                     'Region': body.get('region') or body.get('Region'),
                     'Tone': body.get('tone') or body.get('Tone'),
-                    'LogoUrl': body.get('logoUrl') or body.get('LogoUrl'),
+                    'LogoUrl': logo_url, 
                     'Colors': body.get('colors') or body.get('Colors', []),
                     'Platforms': body.get('platforms') or body.get('Platforms', ['Twitter']),
                     'UpdatedAt': int(time.time())
                 }
                 table.put_item(Item=brand_item)
-                return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'message': 'Aura Initialized'})}
-            elif method == 'GET':
-                response = table.get_item(Key={'UserId': user_id})
-                return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps(response.get('Item', {}), cls=DecimalEncoder)}
-
+                return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'message': 'Aura Initialized', 'logoUrl': logo_url})}
+            
         # --- 4. CHAT, HISTORY, & STEP FUNCTIONS ---
         if path == "/" or path == "":
             if method == 'GET':

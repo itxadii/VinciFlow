@@ -1,11 +1,27 @@
 {
-  "Comment": "VinciFlow Content Generation Pipeline - Fixed Context Flow",
+  "Comment": "VinciFlow Content Generation Pipeline - Stateful Intent Flow",
   "StartAt": "ParseIntent",
   "States": {
     "ParseIntent": {
       "Type": "Task",
       "Resource": "${arn_lambda_intent_parser}",
-      "Next": "ProcessPosts"
+      "Next": "CheckIntentStatus"
+    },
+    "CheckIntentStatus": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.task",
+          "StringEquals": "AWAIT_CLARIFICATION",
+          "Next": "EndForClarification"
+        }
+      ],
+      "Default": "ProcessPosts"
+    },
+    "EndForClarification": {
+      "Type": "Pass",
+      "Comment": "Pipeline stops here to let user provide missing info.",
+      "End": true
     },
     "ProcessPosts": {
       "Type": "Map",

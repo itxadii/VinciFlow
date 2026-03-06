@@ -16,7 +16,7 @@ module "dynamodb" {
 module "bedrock_agent" {
   source = "../../modules/bedrock_agent"
 
-  env                  = "dev"
+  env                  = var.env
   account_id           = data.aws_caller_identity.current.account_id
   lambda_function_arn  = module.lambda.lambda_function_arn
   lambda_function_name = module.lambda.lambda_function_name
@@ -39,8 +39,8 @@ module "iam" {
   dynamodb_table_arn     = module.dynamodb.table_arn
   brands_table_arn       = module.dynamodb.brands_table_arn
   state_machine_arn      = module.step_functions.state_machine_arn
-  # Connect the output from bedrock_agent to the iam variable
-  agent_role_arn = module.bedrock_agent.agent_role_arn 
+  agent_role_arn         = module.bedrock_agent.agent_role_arn 
+  assets_bucket_arn      = module.brand_assets_s3.assets_bucket_arn
 }
 
 module "brand_assets_s3" {
@@ -108,6 +108,8 @@ module "lambda" {
   # Existing Memory Table
   dynamodb_table      = module.dynamodb.table_name
   dynamodb_table_arn  = module.dynamodb.table_arn
+  scheduler_role_arn  = module.iam.scheduler_role_arn
+  assets_bucket_name  = module.brand_assets_s3.assets_bucket_id
   
   # NEW: Brand Table Wiring
   brands_table_name   = module.dynamodb.brands_table_name

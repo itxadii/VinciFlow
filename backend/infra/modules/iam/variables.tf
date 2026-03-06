@@ -20,3 +20,8 @@ variable "agent_role_arn" {
   type        = string
   description = "The ARN of the IAM role assigned to the Bedrock Agent"
 }
+
+variable "assets_bucket_arn" {
+  type        = string
+  description = "The ARN of the assets bucket from S3 module"
+}

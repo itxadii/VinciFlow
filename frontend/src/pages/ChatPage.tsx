@@ -175,11 +175,27 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
 
   // --- 5. ACCEPT/REJECT HANDLERS ---
   const handleAcceptFlow = async (item: any) => {
-    try {
-      await updateFlowStatus(item.Timestamp, item.SessionId, 'SCHEDULED');
-      toast.success("Post Scheduled to X! 🚀");
-      loadSpecificChat(currentSessionId); // Refresh to show status update
-    } catch (err) { toast.error("Sync failed."); }
+  // 1. Loading state for specific item (Optional toast)
+  const toastId = toast.loading("Scheduling Aura Flow...");
+  
+  try {
+    // 2. Call API with timestamp, session, and the target time
+    await apiClient.post('/schedule', {
+      timestamp: item.Timestamp,
+      sessionId: item.SessionId,
+      status: 'SCHEDULED',
+      scheduledTime: item.ScheduledDate // 🚀 LLM parsed this earlier
+    });
+
+    toast.success("Post successfully locked & scheduled! 🚀", { id: toastId });
+    
+    // 3. UI Sync: Refresh data to show the 'Scheduled' badge
+    loadSpecificChat(currentSessionId); 
+    
+  } catch (err) {
+    console.error("Scheduling failed:", err);
+    toast.error("Failed to sync with EventBridge.", { id: toastId });
+  }
   };
 
   return (
@@ -239,16 +255,17 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
             <div className="flex-1 overflow-y-auto p-8 pt-0 space-y-8 no-scrollbar pb-24">
               {generatedItems.length === 0 && <p className="text-slate-400 text-center py-10">Synthesizing your flows...</p>}
               {generatedItems.map((item) => (
-                <ResultCard 
-                  key={item.Timestamp}
-                  image={item.ImageUrl || 'https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png'}
-                  content={item.AgentResponse} // Clean caption from backend
-                  hashtags={[]} // Already included in content
-                  status={item.Status}
-                  onAccept={() => handleAcceptFlow(item)}
-                  onReject={() => setGeneratedItems(prev => prev.filter(i => i.Timestamp !== item.Timestamp))}
-                />
-              ))}
+              <ResultCard 
+                key={item.Timestamp}
+                image={item.ImageUrl || 'https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png'}
+                content={item.AgentResponse}
+                hashtags={[]}
+                status={item.Status}
+                scheduledDate={item.ScheduledDate} // 🚀 Pass the date to the card
+                onAccept={() => handleAcceptFlow(item)}
+                onReject={() => setGeneratedItems(prev => prev.filter(i => i.Timestamp !== item.Timestamp))}
+              />
+            ))}
             </div>
           </aside>
         )}

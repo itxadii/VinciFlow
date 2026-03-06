@@ -36,6 +36,22 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role" "scheduler_role" {
+  name = "vinciflow-${var.env}-scheduler-role"
+
+  # Ye policy Scheduler service ko allow karti hai ye role 'assume' karne ke liye
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "scheduler.amazonaws.com"
+      }
+    }]
+  })
+}
+
 resource "aws_iam_role_policy" "lambda_access_policy" {
   name       = "vinciflow-${var.env}-lambda-access-policy"
   role       = aws_iam_role.lambda_exec.id
@@ -84,8 +100,25 @@ resource "aws_iam_role_policy" "lambda_access_policy" {
         Action   = "ssm:GetParameter"
         Effect   = "Allow"
         Resource = "arn:aws:ssm:ap-south-1:256364432182:parameter/vinciflow/${var.env}/state_machine_arn"
+      },
+      {
+        Effect = "Allow"
+        Action = ["s3:PutObject", "s3:PutObjectAcl", "s3:GetObject"]
+        Resource = [
+        "${var.assets_bucket_arn}/logos/*",          
+        "${var.assets_bucket_arn}/generatedimages/*"
+      ]
+      },
+      {
+        Effect = "Allow"
+        Action = ["scheduler:CreateSchedule"]
+        Resource = ["arn:aws:scheduler:ap-south-1:256364432182:schedule/*"]
+      },
+      {
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
+        Resource = [aws_iam_role.scheduler_role.arn]
       }
-      # REMOVED KMS STATEMENT
     ]
   })
 }

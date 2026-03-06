@@ -44,6 +44,8 @@ resource "aws_lambda_function" "ai_agent" {
       # Database Config
       DYNAMODB_TABLE_NAME    = var.dynamodb_table 
       BRANDS_TABLE_NAME      = var.brands_table_name
+      SCHEDULER_ROLE_ARN     = var.scheduler_role_arn
+      ASSETS_BUCKET_NAME     = var.assets_bucket_name
 
       # Bedrock (Intelligence Plane)
       BEDROCK_AGENT_ID       = "Y65UM8CFJP"
