@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar';
 import MessageList from '../components/MessageList';
 import ChatInput from '../components/ChatInput';
 import ResultCard from '../components/GeneratedResults';
-import { sendMessageToBackend, getChatHistory, apiClient, updateFlowStatus } from '../services/api'; // Added updateFlowStatus
+import { sendMessageToBackend, getChatHistory, apiClient } from '../services/api'; // Added updateFlowStatus
 import { convertToBase64 } from '../utils/file';
 import type { Message, ChatRequest } from '../types/chat';
 import { getBrandProfile } from '../services/brandApi'; 
