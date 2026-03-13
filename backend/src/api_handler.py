@@ -76,27 +76,46 @@ def handler(event, context):
             
             elif method == 'POST':
                 body = json.loads(event.get('body', '{}'))
-                user_prompt = body.get('prompt', '').strip(); session_id = body.get('sessionId') or str(uuid.uuid4())
+                user_prompt = body.get('prompt', '').strip() or "Hello"
+                session_id = body.get('sessionId') or str(uuid.uuid4())
+                file_obj = body.get('file')
                 brand_info = dynamodb_resource.Table(BRANDS_TABLE).get_item(Key={'UserId': user_id}).get('Item', {})
-
+                b_name = brand_info.get('BrandName', 'Global Brand')
+                b_industry = brand_info.get('Industry', 'Lifestyle')
+                b_tone = brand_info.get('Tone', 'Professional')
                 if any(w in user_prompt.lower() for w in ["create", "generate", "post"]) and any(c.isdigit() for c in user_prompt):
                     sfn_arn = ssm_client.get_parameter(Name="/vinciflow/dev/state_machine_arn")['Parameter']['Value']
                     sfn_client.start_execution(stateMachineArn=sfn_arn, input=json.dumps({"userId": user_id, "sessionId": session_id, "prompt": user_prompt, "task": "PARSE", "brandContext": {"name": brand_info.get('BrandName'), "industry": brand_info.get('Industry'), "tone": brand_info.get('Tone')}}))
                     return {'statusCode': 202, 'headers': cors_headers, 'body': json.dumps({'message': 'Pipeline Started'})}
 
                 ai_response = ""
-                file_obj = body.get('file')
                 if file_obj:
                     file_bytes = base64.b64decode(file_obj['data'])
-                    msg = [{"role": "user", "content": [{"text": f"Act as AI for {brand_info.get('BrandName')}. User: {user_prompt}"}]}]
-                    if file_obj['type'] == 'application/pdf': msg[0]['content'].insert(0, {"document": {"name": "doc", "format": "pdf", "source": {"bytes": file_bytes}}})
-                    res = bedrock_runtime.converse(modelId="us.amazon.nova-lite-v1:0", messages=msg)
-                    ai_response = res['output']['message']['content'][0]['text']
+                    system_instr = f"Act as AI for {b_name} ({b_industry}). Tone: {b_tone}."
+                    message_content = []
+                    if file_obj['type'] == 'application/pdf':
+                        message_content.append({"document": {"name": "doc", "format": "pdf", "source": {"bytes": file_bytes}}})
+                    elif file_obj['type'].startswith('image/'):
+                        fmt = file_obj['type'].split('/')[-1].replace('jpg', 'jpeg')
+                        message_content.append({"image": {"format": fmt, "source": {"bytes": file_bytes}}})
+                    
+                    message_content.append({"text": f"{system_instr}\n\nUser: {user_prompt}"})
+                    response = bedrock_runtime.converse(modelId="us.amazon.nova-lite-v1:0", messages=[{"role": "user", "content": message_content}])
+                    ai_response = response['output']['message']['content'][0]['text']
                 else:
-                    res = agent_client.invoke_agent(agentId=AGENT_ID, agentAliasId=AGENT_ALIAS_ID, sessionId=session_id, inputText=user_prompt)
-                    ai_response = "".join([chunk.get('chunk', {}).get('bytes', b'').decode('utf-8') for chunk in res.get('completion')])
-                
-                dynamodb_resource.Table(TABLE_NAME).put_item(Item={'UserId': user_id, 'Timestamp': int(time.time()), 'SessionId': session_id, 'UserMessage': user_prompt, 'AgentResponse': ai_response})
+                    injected_prompt = f"[SYSTEM: Act as {b_name} ({b_industry}) with {b_tone} tone] {user_prompt}"
+                    response = agent_client.invoke_agent(
+                        agentId=AGENT_ID, agentAliasId=AGENT_ALIAS_ID,
+                        sessionId=session_id, inputText=injected_prompt,
+                        sessionState={'sessionAttributes': {'brandContext': json.dumps({"BrandName": b_name, "Industry": b_industry, "Tone": b_tone})}}
+                    )
+                    ai_response = "".join([chunk.get('chunk', {}).get('bytes', b'').decode('utf-8') for chunk in response.get('completion')])
+
+                # Save Memory (Just like Monolith)
+                dynamodb_resource.Table(TABLE_NAME).put_item(Item={
+                    'UserId': user_id, 'Timestamp': int(time.time()), 'SessionId': session_id,
+                    'UserMessage': user_prompt, 'AgentResponse': ai_response
+                })
                 return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'response': ai_response, 'sessionId': session_id})}
 
         return {'statusCode': 404, 'headers': cors_headers, 'body': json.dumps({'error': f"Route {path} Not Found"})}
