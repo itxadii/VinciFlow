@@ -26,13 +26,20 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading }) => {
 
         {/* 2. Message Mapping */}
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[90%] transition-all duration-300 ${
-              msg.role === 'user' 
-                ? 'bg-[#E2E8F0]/80 backdrop-blur-sm text-slate-800 rounded-2xl px-5 py-3 shadow-sm font-["Montserrat"] font-medium' // User Message
-                : 'text-slate-800 font-["Merriweather"] font-light text-[17px] leading-[1.7]' // Assistant Message
-            }`}>
-              <p className="whitespace-pre-wrap select-text">
+          <div
+            key={msg.id}
+            className={`flex w-full ${
+              msg.role === "user" ? "justify-end" : "justify-start"
+            }`}
+          >
+            <div
+              className={`max-w-[75%] transition-all duration-300 ${
+                msg.role === "user"
+                  ? "bg-gray-200 text-slate-800 rounded-2xl rounded-tr-none px-5 py-3 shadow-sm font-['Montserrat'] font-medium"
+                  : "text-slate-800 font-['Merriweather'] font-light text-[17px] leading-[1.7]"
+              }`}
+            >
+              <p className="whitespace-pre-wrap wrap-break-words select-text">
                 {msg.content}
               </p>
             </div>
