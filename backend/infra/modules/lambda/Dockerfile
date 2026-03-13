@@ -1,9 +1,14 @@
 FROM public.ecr.aws/lambda/python:3.12
 
-# Context is now the VinciFlow/ folder
+# 📂 Copy dependencies
 COPY backend/src/requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY backend/src/handler.py .
+# 📂 Copy all refactored logic files
+COPY backend/src/api_handler.py .
+COPY backend/src/pipeline_handler.py .
+COPY backend/src/publish_handler.py .
+COPY backend/src/utils.py .
 
-CMD [ "handler.handler" ]
+# Default entrypoint (Terraform will override this for each function)
+CMD [ "api_handler.handler" ]

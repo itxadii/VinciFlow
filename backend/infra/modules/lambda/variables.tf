@@ -60,3 +60,8 @@ variable "assets_bucket_name" {
   type        = string
   description = "The name of the assets bucket"
 }
+
+variable "state_machine_arn" {
+  type        = string
+  description = "The ARN of the Step Function State Machine"
+}

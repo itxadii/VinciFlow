@@ -14,22 +14,21 @@ module "dynamodb" {
 }
 
 module "bedrock_agent" {
-  source = "../../modules/bedrock_agent"
-
-  env                  = var.env
-  account_id           = data.aws_caller_identity.current.account_id
-  lambda_function_arn  = module.lambda.lambda_function_arn
-  lambda_function_name = module.lambda.lambda_function_name
-  agent_instruction    = "You are the VinciFlow Orchestrator. Help users create posts..."
+  source                = "../../modules/bedrock_agent"
+  env                   = var.env
+  account_id            = data.aws_caller_identity.current.account_id
+  lambda_function_arn   = module.lambda.api_lambda_arn
+  lambda_function_name  = module.lambda.api_lambda_name
 }
 
 module "step_functions" {
   source                   = "../../modules/step_functions"
   env                      = var.env
-  lambda_intent_parser_arn = module.lambda.lambda_function_arn
-  lambda_generator_arn     = module.lambda.lambda_function_arn 
-  lambda_branding_arn      = module.lambda.lambda_function_arn
-  lambda_storage_arn       = module.lambda.lambda_function_arn
+  # 🚀 Pointing all tasks to Pipeline Lambda
+  lambda_intent_parser_arn = module.lambda.pipeline_lambda_arn
+  lambda_generator_arn     = module.lambda.pipeline_lambda_arn
+  lambda_branding_arn      = module.lambda.pipeline_lambda_arn
+  lambda_storage_arn       = module.lambda.pipeline_lambda_arn
 }
 
 # 3. IAM Module (Permissions)
@@ -56,10 +55,9 @@ module "brand_assets_s3" {
 module "api_gateway" {
   source                      = "../../modules/api_gateway"
   env                         = var.env
-  lambda_function_invoke_arn  = module.lambda.lambda_function_invoke_arn
-  
-  lambda_function_name        = module.lambda.lambda_function_name 
-  
+  # 🚀 Pointing to API Lambda
+  lambda_function_invoke_arn  = module.lambda.api_lambda_invoke_arn
+  lambda_function_name        = module.lambda.api_lambda_name
   cognito_user_pool_id        = module.auth.user_pool_id
   cognito_client_id           = module.auth.client_id
 }
@@ -100,30 +98,31 @@ data "aws_ssm_parameter" "x_client_secret" {
 # 4. Lambda Module
 # Updated: Added brands_table name and arn to environment variables and permissions.
 module "lambda" {
-  source              = "../../modules/lambda"
-  env                 = var.env
-  deploy_bucket_id    = module.s3.bucket_id
-  iam_role_arn        = module.iam.lambda_role_arn
+  source             = "../../modules/lambda"
+  env                = var.env
+  iam_role_arn       = module.iam.lambda_role_arn
   
-  # Existing Memory Table
-  dynamodb_table      = module.dynamodb.table_name
-  dynamodb_table_arn  = module.dynamodb.table_arn
-  scheduler_role_arn  = module.iam.scheduler_role_arn
-  assets_bucket_name  = module.brand_assets_s3.assets_bucket_id
-  
-  # NEW: Brand Table Wiring
-  brands_table_name   = module.dynamodb.brands_table_name
-  brands_table_arn    = module.dynamodb.brands_table_arn
-  
-  api_gateway_id      = module.api_gateway.api_id
-  gemini_api_key      = data.aws_ssm_parameter.gemini_key.value
-  x_api_key        = data.aws_ssm_parameter.x_api_key.value
-  x_api_secret     = data.aws_ssm_parameter.x_api_secret.value
-  x_client_id      = data.aws_ssm_parameter.x_client_id.value
-  x_client_secret  = data.aws_ssm_parameter.x_client_secret.value
+  deploy_bucket_id   = module.s3.bucket_id
+  api_gateway_id     = module.api_gateway.api_id
 
+  # Tables & Roles
+  dynamodb_table     = module.dynamodb.table_name
+  dynamodb_table_arn = module.dynamodb.table_arn
+  brands_table_name  = module.dynamodb.brands_table_name
+  brands_table_arn   = module.dynamodb.brands_table_arn
+  scheduler_role_arn = module.iam.scheduler_role_arn
+  assets_bucket_name = module.brand_assets_s3.assets_bucket_id
+  
+  # Trigger Config
+  state_machine_arn  = module.step_functions.state_machine_arn
+  
+  # Secrets from SSM
+  gemini_api_key     = data.aws_ssm_parameter.gemini_key.value
+  x_client_id        = data.aws_ssm_parameter.x_client_id.value
+  x_client_secret    = data.aws_ssm_parameter.x_client_secret.value
+  x_api_key          = data.aws_ssm_parameter.x_api_key.value
+  x_api_secret       = data.aws_ssm_parameter.x_api_secret.value
 }
-
 resource "aws_ssm_parameter" "sfn_arn" {
   name  = "/vinciflow/${var.env}/state_machine_arn"
   type  = "String"

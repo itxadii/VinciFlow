@@ -11,7 +11,7 @@ interface ResultCardProps {
   scheduledDate?: string;
 }
 
-const ResultCard: React.FC<ResultCardProps> = ({ image, content, hashtags, onAccept, onReject, status, scheduledDate }) => {
+const ResultCard: React.FC<ResultCardProps> = ({ image, content, onAccept, onReject, status, scheduledDate }) => {
   const isScheduled = status === 'SCHEDULED';
 
   return (
