@@ -91,7 +91,15 @@ def handler(event, context):
                 ai_response = ""
                 if file_obj:
                     file_bytes = base64.b64decode(file_obj['data'])
-                    system_instr = f"Act as AI for {b_name} ({b_industry}). Tone: {b_tone}."
+                    
+                    # 🚀 FIX: Replacing 'Orchestrator' with 'Aura / Creative Partner'
+                    system_instr = (
+                        f"You are VinciFlow Aura, the dedicated Creative Partner for '{b_name}' ({b_industry}). "
+                        f"Your role is to simplify and automate content creation while maintaining a {b_tone} tone. "
+                        f"Remember: You are the assistant helping the brand, not the brand itself. "
+                        f"Be helpful, efficient, and professional."
+                    )
+                    
                     message_content = []
                     if file_obj['type'] == 'application/pdf':
                         message_content.append({"document": {"name": "doc", "format": "pdf", "source": {"bytes": file_bytes}}})
@@ -99,11 +107,17 @@ def handler(event, context):
                         fmt = file_obj['type'].split('/')[-1].replace('jpg', 'jpeg')
                         message_content.append({"image": {"format": fmt, "source": {"bytes": file_bytes}}})
                     
-                    message_content.append({"text": f"{system_instr}\n\nUser: {user_prompt}"})
+                    message_content.append({"text": f"{system_instr}\n\nUser Question: {user_prompt}"})
                     response = bedrock_runtime.converse(modelId="us.amazon.nova-lite-v1:0", messages=[{"role": "user", "content": message_content}])
                     ai_response = response['output']['message']['content'][0]['text']
                 else:
-                    injected_prompt = f"[SYSTEM: Act as {b_name} ({b_industry}) with {b_tone} tone] {user_prompt}"
+                    # 🚀 FIX: Refined prompt for Bedrock Agent
+                    injected_prompt = (
+                        f"[SYSTEM: Your identity is VinciFlow Aura, a Creative Partner for {b_name}. "
+                        f"Help them automate their {b_industry} content using a {b_tone} tone. "
+                        f"Always identify as VinciFlow Aura.] {user_prompt}"
+                    )
+                    
                     response = agent_client.invoke_agent(
                         agentId=AGENT_ID, agentAliasId=AGENT_ALIAS_ID,
                         sessionId=session_id, inputText=injected_prompt,
@@ -111,7 +125,7 @@ def handler(event, context):
                     )
                     ai_response = "".join([chunk.get('chunk', {}).get('bytes', b'').decode('utf-8') for chunk in response.get('completion')])
 
-                # Save Memory (Just like Monolith)
+                # Save Memory
                 dynamodb_resource.Table(TABLE_NAME).put_item(Item={
                     'UserId': user_id, 'Timestamp': int(time.time()), 'SessionId': session_id,
                     'UserMessage': user_prompt, 'AgentResponse': ai_response
