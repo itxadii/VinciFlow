@@ -1,7 +1,7 @@
 import json, uuid, time, base64, hashlib, secrets, traceback, requests, boto3, os
 from utils import dynamodb_resource, get_cors_headers, get_user_id, BRANDS_TABLE, TABLE_NAME, DecimalEncoder, s3_client, ssm_client
 
-# Clients for API Logic
+# Specific Clients
 agent_client = boto3.client('bedrock-agent-runtime', region_name="ap-south-1")
 bedrock_runtime = boto3.client('bedrock-runtime', region_name="us-east-1")
 sfn_client = boto3.client('stepfunctions', region_name="ap-south-1")
@@ -51,8 +51,7 @@ def handler(event, context):
         if "auth/x" in normalized_path:
             table = dynamodb_resource.Table(BRANDS_TABLE)
             if method == "GET" and normalized_path == "auth/x":
-                cv = secrets.token_urlsafe(64)
-                st = secrets.token_urlsafe(16)
+                cv, st = secrets.token_urlsafe(64), secrets.token_urlsafe(16)
                 ch = base64.urlsafe_b64encode(hashlib.sha256(cv.encode()).digest()).decode().replace('=', '')
                 table.update_item(Key={'UserId': user_id}, UpdateExpression="SET x_code_verifier = :cv, x_state = :st", ExpressionAttributeValues={':cv': cv, ':st': st})
                 auth_url = f"https://x.com/i/oauth2/authorize?response_type=code&client_id={X_CLIENT_ID}&redirect_uri={X_REDIRECT_URI}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state={st}&code_challenge={ch}&code_challenge_method=s256"
@@ -60,8 +59,7 @@ def handler(event, context):
 
         if normalized_path == "schedule" and method == "POST":
             body = json.loads(event.get('body', '{}'))
-            post_id = int(body.get('timestamp'))
-            target_time = body.get('scheduledTime')
+            post_id, target_time = int(body.get('timestamp')), body.get('scheduledTime')
             dynamodb_resource.Table(TABLE_NAME).update_item(Key={'UserId': user_id, 'Timestamp': post_id}, UpdateExpression="SET #s = :s, ScheduledTime = :st", ExpressionAttributeNames={'#s': 'Status'}, ExpressionAttributeValues={':s': 'SCHEDULED', ':st': target_time})
             scheduler_client.create_schedule(
                 Name=f"VF-Post-{user_id[:8]}-{post_id}", ScheduleExpression=f"at({target_time})", FlexibleTimeWindow={'Mode': 'OFF'}, ScheduleExpressionTimezone="Asia/Kolkata",
@@ -78,11 +76,9 @@ def handler(event, context):
             
             elif method == 'POST':
                 body = json.loads(event.get('body', '{}'))
-                user_prompt = body.get('prompt', '').strip()
-                session_id = body.get('sessionId') or str(uuid.uuid4())
+                user_prompt = body.get('prompt', '').strip(); session_id = body.get('sessionId') or str(uuid.uuid4())
                 brand_info = dynamodb_resource.Table(BRANDS_TABLE).get_item(Key={'UserId': user_id}).get('Item', {})
 
-                # Step Function Trigger
                 if any(w in user_prompt.lower() for w in ["create", "generate", "post"]) and any(c.isdigit() for c in user_prompt):
                     sfn_arn = ssm_client.get_parameter(Name="/vinciflow/dev/state_machine_arn")['Parameter']['Value']
                     sfn_client.start_execution(stateMachineArn=sfn_arn, input=json.dumps({"userId": user_id, "sessionId": session_id, "prompt": user_prompt, "task": "PARSE", "brandContext": {"name": brand_info.get('BrandName'), "industry": brand_info.get('Industry'), "tone": brand_info.get('Tone')}}))
