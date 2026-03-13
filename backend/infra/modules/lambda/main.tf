@@ -1,61 +1,4 @@
-# backend/infra/modules/lambda/main.tf
-
-# 1. IAM Role for Lambda
-resource "aws_iam_role" "lambda_role" {
-  name = "vinciflow-${var.env}-lambda-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
-  })
-}
-
-# 2. Basic Execution Role (Logs)
-resource "aws_iam_role_policy_attachment" "lambda_logs" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-# 3. COMPREHENSIVE POLICY: Bedrock + DynamoDB
-# 3. COMPREHENSIVE POLICY: Bedrock + DynamoDB (Memory & Brands)
-resource "aws_iam_role_policy" "vinciflow_access_policy" {
-  name = "vinciflow-${var.env}-access-policy"
-  role = aws_iam_role.lambda_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action   = [
-          "bedrock:InvokeAgent",
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream"
-        ]
-        Effect   = "Allow"
-        Resource = [
-          "arn:aws:bedrock:ap-south-1:256364432182:agent/Y65UM8CFJP",
-          "arn:aws:bedrock:ap-south-1:256364432182:agent-alias/Y65UM8CFJP/*",
-          "arn:aws:bedrock:us-east-1:256364432182:inference-profile/us.amazon.nova-lite-v1:0",
-          "arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0" 
-        ]
-      },
-      # DynamoDB Access (Memory AND Brands)
-      {
-        Action   = ["dynamodb:PutItem", "dynamodb:Query", "dynamodb:GetItem", "dynamodb:UpdateItem"]
-        Effect   = "Allow"
-        Resource = [
-          var.dynamodb_table_arn,
-          var.brands_table_arn
-        ]
-      }
-    ]
-  })
-}
-
-# 4. ECR Repository
+# 1. ECR Repository for the AI Agent Image
 resource "aws_ecr_repository" "ai_agent" {
   name                 = "vinciflow-${var.env}-ai-agent"
   image_tag_mutability = "MUTABLE"
@@ -66,7 +9,7 @@ resource "aws_ecr_repository" "ai_agent" {
   }
 }
 
-# 5. Build & Push Sequence
+# 2. Build & Push Sequence (Using Docker for Multimodal/Heavy Dependencies)
 resource "terraform_data" "lambda_package" {
   input = sha256(join("", [
     filebase64sha256("${path.module}/../../../src/handler.py"),
@@ -79,18 +22,17 @@ resource "terraform_data" "lambda_package" {
   }
 }
 
-# 6. Data Source for ECR Image Digest (Force Deployment Fix)
+# 3. Data Source for ECR Image Digest
 data "aws_ecr_image" "lambda_image" {
   repository_name = aws_ecr_repository.ai_agent.name
-  image_tag       = "latest"
+  image_tag        = "latest"
   depends_on      = [terraform_data.lambda_package]
 }
 
-# 7. THE FUNCTION
-# 7. THE FUNCTION
+# 4. THE AI AGENT FUNCTION
 resource "aws_lambda_function" "ai_agent" {
-  function_name = "vinciflow-dev-ai-agent"
-  role          = aws_iam_role.lambda_role.arn
+  function_name = "vinciflow-${var.env}-ai-agent"
+  role          = var.iam_role_arn
   package_type  = "Image"
   timeout       = 30
   memory_size   = 512
@@ -99,21 +41,25 @@ resource "aws_lambda_function" "ai_agent" {
 
   environment {
     variables = {
+      # Database Config
       DYNAMODB_TABLE_NAME    = var.dynamodb_table 
-      # NEW: Environment variable for Brand Onboarding logic
-      BRANDS_TABLE_NAME      = var.brands_table_name 
+      BRANDS_TABLE_NAME      = var.brands_table_name
+      SCHEDULER_ROLE_ARN     = var.scheduler_role_arn
+      ASSETS_BUCKET_NAME     = var.assets_bucket_name
+
+      # Bedrock (Intelligence Plane)
       BEDROCK_AGENT_ID       = "Y65UM8CFJP"
       BEDROCK_AGENT_ALIAS_ID = "TSTALIASID"
+      
+      # External APIs
       GEMINI_API_KEY         = var.gemini_api_key
-      X_API_KEY              = var.x_api_key
-      X_API_SECRET           = var.x_api_secret
       X_CLIENT_ID            = var.x_client_id
       X_CLIENT_SECRET        = var.x_client_secret
+      
+      # Deployment tracking
       CODE_VERSION           = terraform_data.lambda_package.output
     }
   }
 
   depends_on = [terraform_data.lambda_package]
 }
-
-data "aws_caller_identity" "current" {}

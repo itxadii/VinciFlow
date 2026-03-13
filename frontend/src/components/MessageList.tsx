@@ -9,9 +9,9 @@ interface MessageListProps {
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, scrollRef }) => {
+const MessageList: React.FC<MessageListProps> = ({ messages, isLoading }) => {
   return (
-    <main className="flex-1 overflow-y-auto p-4 md:px-24 space-y-10 custom-scrollbar z-10">
+    <main className="flex-1 overflow-y-auto p-4 md:px-10 space-y-10 custom-scrollbar z-10">
       <div className="max-w-4xl mx-auto space-y-10 pt-10">
         
         {/* 1. Empty State with Branding Fonts */}
@@ -41,9 +41,6 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, scrollRe
 
         {/* 3. Your Custom Loader integration */}
         {isLoading && <ResponseLoader />}
-
-        {/* 4. Anchor for Auto-scroll */}
-        <div ref={scrollRef} className="h-24" />
       </div>
     </main>
   );

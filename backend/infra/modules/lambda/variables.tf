@@ -50,3 +50,13 @@ variable "x_client_secret"  {
   type = string
   sensitive = true 
 }
+
+variable "scheduler_role_arn" {
+  type        = string
+  description = "The ARN of the IAM role for EventBridge Scheduler"
+}
+
+variable "assets_bucket_name" {
+  type        = string
+  description = "The name of the assets bucket"
+}

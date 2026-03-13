@@ -1,0 +1,71 @@
+{
+  "Comment": "VinciFlow Content Generation Pipeline - Stateful Intent Flow",
+  "StartAt": "ParseIntent",
+  "States": {
+    "ParseIntent": {
+      "Type": "Task",
+      "Resource": "${arn_lambda_intent_parser}",
+      "Next": "CheckIntentStatus"
+    },
+    "CheckIntentStatus": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.task",
+          "StringEquals": "AWAIT_CLARIFICATION",
+          "Next": "EndForClarification"
+        }
+      ],
+      "Default": "ProcessPosts"
+    },
+    "EndForClarification": {
+      "Type": "Pass",
+      "Comment": "Pipeline stops here to let user provide missing info.",
+      "End": true
+    },
+    "ProcessPosts": {
+      "Type": "Map",
+      "ItemsPath": "$.posts",
+      "ItemSelector": {
+        "topic.$": "$$.Map.Item.Value.topic",
+        "date.$": "$$.Map.Item.Value.date",
+        "type.$": "$$.Map.Item.Value.type",
+        "userId.$": "$.userId",
+        "sessionId.$": "$.sessionId",
+        "brandContext.$": "$.brandContext",
+        "prompt.$": "$.prompt",
+        "task": "GENERATE" 
+      },
+      "MaxConcurrency": 5,
+      "Iterator": {
+        "StartAt": "GenerateContent",
+        "States": {
+          "GenerateContent": {
+            "Type": "Task",
+            "Resource": "${arn_lambda_generator}",
+            "Retry": [
+              {
+                "ErrorEquals": ["Lambda.TooManyRequestsException", "ServiceException"],
+                "IntervalSeconds": 2,
+                "MaxAttempts": 3,
+                "BackoffRate": 2.0
+              }
+            ],
+            "Next": "ApplyBranding"
+          },
+          "ApplyBranding": {
+            "Type": "Task",
+            "Resource": "${arn_lambda_branding}",
+            "Next": "StoreDraft"
+          },
+          "StoreDraft": {
+            "Type": "Task",
+            "Resource": "${arn_lambda_storage}",
+            "End": true
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}

@@ -16,20 +16,41 @@ module "dynamodb" {
 module "bedrock_agent" {
   source = "../../modules/bedrock_agent"
 
-  env                  = "dev"
+  env                  = var.env
   account_id           = data.aws_caller_identity.current.account_id
   lambda_function_arn  = module.lambda.lambda_function_arn
   lambda_function_name = module.lambda.lambda_function_name
   agent_instruction    = "You are the VinciFlow Orchestrator. Help users create posts..."
 }
 
+module "step_functions" {
+  source                   = "../../modules/step_functions"
+  env                      = var.env
+  lambda_intent_parser_arn = module.lambda.lambda_function_arn
+  lambda_generator_arn     = module.lambda.lambda_function_arn 
+  lambda_branding_arn      = module.lambda.lambda_function_arn
+  lambda_storage_arn       = module.lambda.lambda_function_arn
+}
+
 # 3. IAM Module (Permissions)
-# Updated: Passing both table ARNs to allow Lambda access to memory AND brands.
 module "iam" {
-  source              = "../../modules/iam"
-  env                 = var.env
-  dynamodb_table_arn  = module.dynamodb.table_arn     # Compatibility (Memory Table)
-  brands_table_arn    = module.dynamodb.brands_table_arn # NEW: Access to Brand Profiles
+  source                 = "../../modules/iam"
+  env                    = var.env
+  dynamodb_table_arn     = module.dynamodb.table_arn
+  brands_table_arn       = module.dynamodb.brands_table_arn
+  state_machine_arn      = module.step_functions.state_machine_arn
+  agent_role_arn         = module.bedrock_agent.agent_role_arn 
+  assets_bucket_arn      = module.brand_assets_s3.assets_bucket_arn
+}
+
+module "brand_assets_s3" {
+  source      = "../../modules/s3"
+  bucket_name = "vinciflow-${var.env}-brand-assets"
+  env         = var.env
+  tags = {
+    Project = "VinciFlow"
+    Owner   = "Aditya"
+  }
 }
 
 module "api_gateway" {
@@ -87,6 +108,8 @@ module "lambda" {
   # Existing Memory Table
   dynamodb_table      = module.dynamodb.table_name
   dynamodb_table_arn  = module.dynamodb.table_arn
+  scheduler_role_arn  = module.iam.scheduler_role_arn
+  assets_bucket_name  = module.brand_assets_s3.assets_bucket_id
   
   # NEW: Brand Table Wiring
   brands_table_name   = module.dynamodb.brands_table_name
@@ -98,4 +121,11 @@ module "lambda" {
   x_api_secret     = data.aws_ssm_parameter.x_api_secret.value
   x_client_id      = data.aws_ssm_parameter.x_client_id.value
   x_client_secret  = data.aws_ssm_parameter.x_client_secret.value
+
+}
+
+resource "aws_ssm_parameter" "sfn_arn" {
+  name  = "/vinciflow/${var.env}/state_machine_arn"
+  type  = "String"
+  value = module.step_functions.state_machine_arn
 }
