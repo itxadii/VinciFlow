@@ -65,3 +65,13 @@ variable "state_machine_arn" {
   type        = string
   description = "The ARN of the Step Function State Machine"
 }
+
+variable "bedrock_agent_id" {
+  type        = string
+  description = "The ID of the Bedrock Agent for chat"
+}
+
+variable "bedrock_agent_alias_id" {
+  type        = string
+  description = "The Alias ID of the Bedrock Agent"
+}

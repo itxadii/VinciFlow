@@ -115,6 +115,8 @@ module "lambda" {
   
   # Trigger Config
   state_machine_arn  = module.step_functions.state_machine_arn
+  bedrock_agent_id       = module.bedrock_agent.agent_id
+  bedrock_agent_alias_id = "TSTALIASID"
   
   # Secrets from SSM
   gemini_api_key     = data.aws_ssm_parameter.gemini_key.value

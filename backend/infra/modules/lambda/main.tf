@@ -5,19 +5,20 @@ resource "aws_ecr_repository" "vinciflow" {
   image_scanning_configuration { scan_on_push = true }
 }
 
-# 2. Build & Push (Tracks ALL files in src directory)
+# 2. Build & Push (Strict Compatibility Mode)
 resource "terraform_data" "lambda_package" {
   input = sha256(join("", [
     for f in fileset("${path.module}/../../../src", "*") : filebase64sha256("${path.module}/../../../src/${f}")
   ]))
 
   provisioner "local-exec" {
-    # 🚀 PowerShell compatible login command
-    command     = "docker build --no-cache --platform linux/amd64 -t vinciflow-app -f '${path.module}/Dockerfile' '${path.module}/../../../..' ; cmd.exe /C \"aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 256364432182.dkr.ecr.ap-south-1.amazonaws.com\" ; powershell.exe -File '${path.module}/build_lambda.ps1' -repository_url ${aws_ecr_repository.vinciflow.repository_url}"
+    # 🚀 FIX: Added --sbom=false for maximum compatibility with Lambda
+    command     = "docker build --no-cache --provenance=false --sbom=false --platform linux/amd64 -t vinciflow-app -f '${path.module}/Dockerfile' '${path.module}/../../../..' ; cmd.exe /C \"aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 256364432182.dkr.ecr.ap-south-1.amazonaws.com\" ; powershell.exe -File '${path.module}/build_lambda.ps1' -repository_url ${aws_ecr_repository.vinciflow.repository_url}"
     interpreter = ["PowerShell", "-Command"]
   }
 }
 
+# Digest is still good for tracking, but we use Tag for deployment to avoid manifest issues
 data "aws_ecr_image" "app_image" {
   repository_name = aws_ecr_repository.vinciflow.name
   image_tag       = "latest"
@@ -31,17 +32,24 @@ resource "aws_lambda_function" "api_lambda" {
   function_name = "vinciflow-${var.env}-api"
   role          = var.iam_role_arn
   package_type  = "Image"
-  timeout       = 29 #
+  timeout       = 29
   memory_size   = 256
-  image_uri     = "${aws_ecr_repository.vinciflow.repository_url}@${data.aws_ecr_image.app_image.id}"
+  # 🚀 FIX: Consistent Tag usage
+  image_uri     = "${aws_ecr_repository.vinciflow.repository_url}:latest"
 
-  image_config { command = ["api_handler.handler"] } # 🚀 Entrypoint override
+  image_config { command = ["api_handler.handler"] }
 
   environment {
     variables = {
       DYNAMODB_TABLE_NAME = var.dynamodb_table
       BRANDS_TABLE_NAME   = var.brands_table_name
       STATE_MACHINE_ARN   = var.state_machine_arn
+      # 🚀 FIX: Missing Wiring for scheduling/logos
+      ASSETS_BUCKET_NAME  = var.assets_bucket_name
+      SCHEDULER_ROLE_ARN  = var.scheduler_role_arn
+      PUBLISH_LAMBDA_ARN  = aws_lambda_function.publish_lambda.arn
+      BEDROCK_AGENT_ID    = var.bedrock_agent_id
+      BEDROCK_AGENT_ALIAS_ID = var.bedrock_agent_alias_id
     }
   }
 }
@@ -51,11 +59,12 @@ resource "aws_lambda_function" "pipeline_lambda" {
   function_name = "vinciflow-${var.env}-pipeline"
   role          = var.iam_role_arn
   package_type  = "Image"
-  timeout       = 300 #
-  memory_size   = 512 #
-  image_uri     = "${aws_ecr_repository.vinciflow.repository_url}@${data.aws_ecr_image.app_image.id}"
+  timeout       = 300 # 5 mins for AI tasks
+  memory_size   = 512
+  # 🚀 FIX: Consistently use :latest
+  image_uri     = "${aws_ecr_repository.vinciflow.repository_url}:latest"
 
-  image_config { command = ["pipeline_handler.handler"] } # 🚀 Entrypoint override
+  image_config { command = ["pipeline_handler.handler"] }
 
   environment {
     variables = {
@@ -72,13 +81,15 @@ resource "aws_lambda_function" "publish_lambda" {
   role          = var.iam_role_arn
   package_type  = "Image"
   timeout       = 60
-  image_uri     = "${aws_ecr_repository.vinciflow.repository_url}@${data.aws_ecr_image.app_image.id}"
+  # 🚀 FIX: Consistently use :latest
+  image_uri     = "${aws_ecr_repository.vinciflow.repository_url}:latest"
 
-  image_config { command = ["publish_handler.handler"] } # 🚀 Entrypoint override
+  image_config { command = ["publish_handler.handler"] }
 
   environment {
     variables = {
       BRANDS_TABLE_NAME = var.brands_table_name
+      TABLE_NAME        = var.dynamodb_table
       X_CLIENT_ID       = var.x_client_id
       X_CLIENT_SECRET   = var.x_client_secret
     }
