@@ -15,10 +15,10 @@ bedrock_runtime = boto3.client('bedrock-runtime', region_name="us-east-1")
 
 def generate_image_gemini(prompt: str, api_key: str) -> bytes:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash-image")
     response = model.generate_content(
         contents=prompt,
-        generation_config={"response_modalities": ["IMAGE", "TEXT"]}
+        generation_config={"response_modalities": ["IMAGE"]}
     )
     for part in response.candidates[0].content.parts:
         if part.inline_data and part.inline_data.mime_type.startswith("image/"):

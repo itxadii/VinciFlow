@@ -5,16 +5,15 @@ import type { Message } from '../types/chat';
 interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
-  // FIX: Type aligned with parent nullability
   scrollRef: React.RefObject<HTMLDivElement | null>;
+  isGeneratingFlow: boolean; // ✅ proper type, not JSX
 }
 
-const MessageList: React.FC<MessageListProps> = ({ messages, isLoading }) => {
+const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, scrollRef, isGeneratingFlow }) => { // ✅ destructured
   return (
     <main className="flex-1 overflow-y-auto p-4 md:px-10 space-y-10 custom-scrollbar z-10">
       <div className="max-w-4xl mx-auto space-y-10 pt-10">
         
-        {/* 1. Empty State with Branding Fonts */}
         {messages.length === 0 && !isLoading && (
           <div className="h-full flex flex-col items-center justify-center opacity-30 text-center mt-20">
             <span className="text-6xl mb-4">🎨</span>
@@ -24,13 +23,10 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading }) => {
           </div>
         )}
 
-        {/* 2. Message Mapping */}
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex w-full ${
-              msg.role === "user" ? "justify-end" : "justify-start"
-            }`}
+            className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
               className={`max-w-[75%] transition-all duration-300 ${
@@ -46,8 +42,10 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading }) => {
           </div>
         ))}
 
-        {/* 3. Your Custom Loader integration */}
-        {isLoading && <ResponseLoader />}
+        {/* ✅ isGeneratingFlow now correctly passed to loader */}
+        {isLoading && <ResponseLoader isGenerating={isGeneratingFlow} />}
+
+        <div ref={scrollRef} /> {/* ✅ scrollRef was never used — add this */}
       </div>
     </main>
   );

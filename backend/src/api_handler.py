@@ -85,8 +85,65 @@ def handler(event, context):
                 b_tone = brand_info.get('Tone', 'Professional')
                 if any(w in user_prompt.lower() for w in ["create", "generate", "post"]) and any(c.isdigit() for c in user_prompt):
                     sfn_arn = ssm_client.get_parameter(Name="/vinciflow/dev/state_machine_arn")['Parameter']['Value']
-                    sfn_client.start_execution(stateMachineArn=sfn_arn, input=json.dumps({"userId": user_id, "sessionId": session_id, "prompt": user_prompt, "task": "PARSE", "brandContext": {"name": brand_info.get('BrandName'), "industry": brand_info.get('Industry'), "tone": brand_info.get('Tone')}}))
-                    return {'statusCode': 202, 'headers': cors_headers, 'body': json.dumps({'message': 'Pipeline Started'})}
+                    
+                    execution = sfn_client.start_execution(
+                        stateMachineArn=sfn_arn,
+                        input=json.dumps({
+                            "userId": user_id,
+                            "sessionId": session_id,
+                            "prompt": user_prompt,
+                            "task": "PARSE",
+                            "brandContext": {
+                                "name": brand_info.get('BrandName'),
+                                "industry": brand_info.get('Industry'),
+                                "tone": brand_info.get('Tone')
+                            }
+                        })
+                    )
+                    execution_arn = execution['executionArn']
+
+                    # ✅ Poll until Step Function finishes (max 25s for API GW timeout)
+                    start = time.time()
+                    while time.time() - start < 25:
+                        time.sleep(2)
+                        desc = sfn_client.describe_execution(executionArn=execution_arn)
+                        status = desc['status']
+
+                        if status == 'SUCCEEDED':
+                            output = json.loads(desc['output'])
+
+                            # AWAIT_CLARIFICATION — return message directly to frontend
+                            if output.get('task') == 'AWAIT_CLARIFICATION':
+                                return {
+                                    'statusCode': 200,
+                                    'headers': cors_headers,
+                                    'body': json.dumps({
+                                        'task': 'AWAIT_CLARIFICATION',
+                                        'message': output.get('message'),
+                                        'response': output.get('message')  # so frontend data.response also works
+                                    })
+                                }
+
+                            # FLOW DONE — frontend will poll DynamoDB via startPolling
+                            return {
+                                'statusCode': 200,
+                                'headers': cors_headers,
+                                'body': json.dumps({'message': 'Pipeline Started'})
+                            }
+
+                        elif status in ('FAILED', 'TIMED_OUT', 'ABORTED'):
+                            return {
+                                'statusCode': 500,
+                                'headers': cors_headers,
+                                'body': json.dumps({'error': f'Pipeline {status}'})
+                            }
+
+                    # Still running after 25s (image gen is slow) — frontend polls DynamoDB
+                    return {
+                        'statusCode': 202,
+                        'headers': cors_headers,
+                        'body': json.dumps({'message': 'Pipeline Started'})
+                    }
 
                 ai_response = ""
                 if file_obj:

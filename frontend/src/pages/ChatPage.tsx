@@ -29,6 +29,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [isGeneratingFlow, setIsGeneratingFlow] = useState(false);
 
   // --- 1. RESIZING LOGIC (UNTOUCHED) ---
   const startResizing = useCallback(() => {
@@ -143,34 +144,67 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
       if (flows.length > 0 || attempts > 15) {
         setGeneratedItems(flows);
         setShowResults(true);
+        setIsGeneratingFlow(false);
         clearInterval(interval);
       }
-    }, 3000); // Polling every 3 seconds
+    }, 3000);
   };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!input.trim() && !selectedFile) || isLoading) return;
-    const userMsgText = input; 
+    const userMsgText = input;
     setMessages(prev => [...prev, { id: uuidv4(), role: 'user', content: input, timestamp: Date.now() }]);
     setIsLoading(true);
 
     try {
       const payload: ChatRequest = { prompt: userMsgText, sessionId: currentSessionId };
       if (selectedFile) payload.file = { name: selectedFile.name, type: selectedFile.type, data: await convertToBase64(selectedFile) };
-      
+
       const data = await sendMessageToBackend(payload);
-      
-      // If Step Function triggers, start polling
-      if ((data as any).message === 'Pipeline Started') {
-        toast.success("Synthesis Started... ⚡");
-        startPolling(currentSessionId);
+
+      // CLARIFICATION — show message, stop loader, return early
+      if ((data as any).type === 'AWAIT_CLARIFICATION') {
+        setMessages(prev => [...prev, {
+          id: uuidv4(),
+          role: 'assistant',
+          content: (data as any).message || "Could you provide more details?",
+          timestamp: Date.now()
+        }]);
+        return; // ✅ exits try, finally still runs (clears input/loading — correct)
       }
 
-      const aiMsg: Message = { id: uuidv4(), role: 'assistant', content: data.response || "Synthesis in progress...", timestamp: Date.now() };
-      setMessages(prev => [...prev, aiMsg]);
-    } catch (error) { console.error(error); } 
-    finally { setIsLoading(false); setInput(''); setSelectedFile(null); }
+      // PIPELINE STARTED — switch to generating loader, start polling, no aiMsg
+      if ((data as any).message === 'Pipeline Started') {
+        toast.success("Synthesis Started... ⚡");
+        setIsGeneratingFlow(true); // ✅ switches loader to "Generating post flow..."
+        setIsLoading(true);        // ✅ keep loader alive during polling (finally will NOT kill it now — see below)
+        startPolling(currentSessionId);
+        return; // ✅ skip generic aiMsg
+      }
+
+      // DEFAULT — normal chat response
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        role: 'assistant',
+        content: data.response || data.message || "I'm here to help!",
+        timestamp: Date.now()
+      }]);
+
+    } catch (error) {
+      console.error(error);
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        role: 'assistant',
+        content: '❌ Something went wrong. Please try again.',
+        timestamp: Date.now()
+      }]);
+    } finally {
+      // Only clear loading if NOT generating a flow (polling manages its own state)
+      if (!isGeneratingFlow) setIsLoading(false);
+      setInput('');
+      setSelectedFile(null);
+    }
   };
 
   // --- 5. ACCEPT/REJECT HANDLERS ---
@@ -227,7 +261,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
             </div>
           )}
 
-          <MessageList messages={messages} isLoading={isLoading} scrollRef={scrollRef} />
+          <MessageList messages={messages} isLoading={isLoading} scrollRef={scrollRef} isGeneratingFlow={isGeneratingFlow}/>
           <ChatInput input={input} setInput={setInput} onSend={handleSend} selectedFile={selectedFile} setSelectedFile={setSelectedFile} isLoading={isLoading} />
         </div>
 
