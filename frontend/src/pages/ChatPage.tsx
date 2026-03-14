@@ -131,13 +131,12 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
         .filter((m: any) =>
           !m.AgentResponse?.includes('Generating your content flow') &&
           !m.AgentResponse?.includes('Preparing your flow') &&
-          !m.AgentResponse?.includes('⏳')
+          !m.AgentResponse?.startsWith('⏳')  // ✅ filter placeholder
         )
         .flatMap((m: any) => [
           { role: 'user' as const, content: m.UserMessage, id: uuidv4(), timestamp: Number(m.Timestamp) },
           { role: 'assistant' as const, content: m.AgentResponse, id: uuidv4(), timestamp: Number(m.Timestamp) }
         ]);
-      setMessages(chatMsgs);
 
       // ✅ Flow items
       const flows = sessionItems.filter((m: any) =>
@@ -164,6 +163,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
           setGeneratingFlow(false);
           setIsLoading(false);
           clearInterval(interval);
+          loadSpecificChat(sid); // ✅ refresh chat messages too
         } else if (attempts > 15) {
           setGeneratingFlow(false);
           setIsLoading(false);

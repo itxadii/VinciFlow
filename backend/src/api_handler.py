@@ -59,13 +59,38 @@ def handler(event, context):
 
         if normalized_path == "schedule" and method == "POST":
             body = json.loads(event.get('body', '{}'))
-            post_id, target_time = int(body.get('timestamp')), body.get('scheduledTime')
-            dynamodb_resource.Table(TABLE_NAME).update_item(Key={'UserId': user_id, 'Timestamp': post_id}, UpdateExpression="SET #s = :s, ScheduledTime = :st", ExpressionAttributeNames={'#s': 'Status'}, ExpressionAttributeValues={':s': 'SCHEDULED', ':st': target_time})
-            scheduler_client.create_schedule(
-                Name=f"VF-Post-{user_id[:8]}-{post_id}", ScheduleExpression=f"at({target_time})", FlexibleTimeWindow={'Mode': 'OFF'}, ScheduleExpressionTimezone="Asia/Kolkata",
-                Target={'Arn': PUBLISH_LAMBDA_ARN, 'RoleArn': SCHEDULER_ROLE_ARN, 'Input': json.dumps({'userId': user_id, 'timestamp': post_id, 'task': 'PUBLISH_X'})},
-                ActionAfterCompletion='DELETE'
+            post_id = int(body.get('timestamp'))
+            target_time = body.get('scheduledTime')
+            platforms = body.get('platforms', ['X'])  # ✅ get platforms from request
+
+            # Update DynamoDB with platforms
+            dynamodb_resource.Table(TABLE_NAME).update_item(
+                Key={'UserId': user_id, 'Timestamp': post_id},
+                UpdateExpression="SET #s = :s, ScheduledTime = :st, Platforms = :pl",
+                ExpressionAttributeNames={'#s': 'Status'},
+                ExpressionAttributeValues={':s': 'SCHEDULED', ':st': target_time, ':pl': platforms}
             )
+
+            # ✅ Create one EventBridge schedule per platform
+            for platform in platforms:
+                scheduler_client.create_schedule(
+                    Name=f"VF-{platform[:2]}-{user_id[:8]}-{post_id}",
+                    ScheduleExpression=f"at({target_time})",
+                    FlexibleTimeWindow={'Mode': 'OFF'},
+                    ScheduleExpressionTimezone="Asia/Kolkata",
+                    Target={
+                        'Arn': PUBLISH_LAMBDA_ARN,
+                        'RoleArn': SCHEDULER_ROLE_ARN,
+                        'Input': json.dumps({
+                            'userId': user_id,
+                            'timestamp': post_id,
+                            'platform': platform,  # ✅ publish lambda knows which platform
+                            'task': 'PUBLISH'
+                        })
+                    },
+                    ActionAfterCompletion='DELETE'
+                )
+
             return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'message': 'Scheduled!'})}
 
         # --- 4. CHAT / ROOT ---
@@ -178,6 +203,15 @@ def handler(event, context):
                     else:
                         combined_prompt = user_prompt
 
+                    # ✅ Save user message immediately so it appears in chat
+                    dynamodb_resource.Table(TABLE_NAME).put_item(Item={
+                        'UserId': user_id,
+                        'Timestamp': int(time.time()),
+                        'SessionId': session_id,
+                        'UserMessage': user_prompt,  # what user actually typed
+                        'AgentResponse': '⏳ Generating your content flow...'  # temp placeholder
+                    })
+
                     sfn_arn = ssm_client.get_parameter(Name="/vinciflow/dev/state_machine_arn")['Parameter']['Value']
                     
                     # ✅ Start execution ONCE
@@ -233,15 +267,7 @@ def handler(event, context):
                                 'headers': cors_headers,
                                 'body': json.dumps({'error': 'Pipeline failed'})
                             }
-
-                    # ✅ Always return this for GENERATE — frontend polls DynamoDB
-                    dynamodb_resource.Table(TABLE_NAME).put_item(Item={
-                        'UserId': user_id,
-                        'Timestamp': int(time.time()),
-                        'SessionId': session_id,
-                        'UserMessage': combined_prompt,
-                        'AgentResponse': f'⏳ Preparing your flow...'
-                    })
+                        
                     return {
                         'statusCode': 200,
                         'headers': cors_headers,

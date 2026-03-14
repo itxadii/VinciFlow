@@ -231,8 +231,11 @@ def handler(event, context):
             # 1. Caption
             model = genai.GenerativeModel('gemini-2.5-flash')
             caption_response = model.generate_content(
-                f"Act as Social Media Head for {brand_name}. Tone: {tone}. "
-                f"Write a viral caption + 5 hashtags for: '{topic}'. No labels."
+                f"You are the Social Media Head for {brand_name} ({brand_ctx.get('industry', '')}). "
+                f"Brand tone: {tone}. "
+                f"Write ONLY a viral social media caption + 5 hashtags for: '{topic}'. "
+                f"Output the caption directly. No intro, no labels, no 'Here is', no explanation. "
+                f"Start directly with the caption text."
             )
 
             # 2. Image
@@ -259,8 +262,26 @@ def handler(event, context):
             brand_name = brand_ctx.get('name', 'Global Brand')
             logo_url = brand_ctx.get('logoUrl')
 
+            clean_content = event.get('rawContent', '')
+
+            # ✅ Strip common Gemini preambles
+            import re
+            preambles = [
+                r"^here'?s? .*?:\s*[-—]*\s*",
+                r"^certainly[!,]?\s*",
+                r"^sure[!,]?\s*",
+                r"^of course[!,]?\s*",
+                r"^viral caption.*?:\s*[-—]*\s*",
+                r"^caption.*?:\s*",
+                r"^hashtags.*?:\s*",
+                r"^\*\*caption.*?\*\*\s*",
+                r"^\*\*hashtags.*?\*\*\s*",
+            ]
+            for pattern in preambles:
+                clean_content = re.sub(pattern, '', clean_content, flags=re.IGNORECASE | re.DOTALL)
+
             clean_content = (
-                event.get('rawContent', '')
+                clean_content
                 .replace("Caption:", "").replace("Hashtags:", "")
                 .replace("**Caption:**", "").replace("**Hashtags:**", "")
                 .strip()
@@ -305,19 +326,37 @@ def handler(event, context):
                 f"Scheduled for {formatted_date}"
             )
 
+            ts = int(time.time())
+
+            # ✅ Chat message — no Status, shows in conversation
             dynamodb_resource.Table(TABLE_NAME).put_item(Item={
                 'UserId': user_id,
-                'Timestamp': int(time.time()),
+                'Timestamp': ts,
                 'SessionId': session_id,
                 'UserMessage': f"📅 {topic.title()}",
-                'AgentResponse': personalized_msg,       # ✅ shown in chat history
-                'PostContent': event.get('finalContent'), # ✅ actual caption for ResultCard
+                'AgentResponse': personalized_msg,
+            })
+
+            # ✅ Flow item — has Status, shows in ResultCard panel
+            dynamodb_resource.Table(TABLE_NAME).put_item(Item={
+                'UserId': user_id,
+                'Timestamp': ts + 1,  # +1 to avoid key collision
+                'SessionId': session_id,
+                'UserMessage': f"📅 Drafted Flow: {post.get('date')}",
+                'AgentResponse': personalized_msg,
+                'PostContent': event.get('finalContent'),
                 'ScheduledDate': post.get('date'),
                 'ImageUrl': event.get('finalImageUrl'),
                 'RawImageUrl': event.get('rawImageUrl'),
                 'Status': 'DRAFT'
             })
 
+            return {
+                "status": "success",
+                "imageUrl": event.get('finalImageUrl'),
+                "content": event.get('finalContent'),
+                "scheduledDate": post.get('date')
+            }
     except Exception as e:
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
