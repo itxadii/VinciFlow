@@ -91,9 +91,16 @@ resource "aws_iam_role_policy" "lambda_access_policy" {
       },
       {
         # Step Functions Trigger
-        Action   = "states:StartExecution"
+        Action = [
+          "states:StartExecution",
+          "states:DescribeExecution",    # 🛠️ Fixed the error here
+          "states:GetExecutionHistory",  # Pro-tip: Debugging ke liye zaruri hai
+          "states:StopExecution"         # Safety ke liye
+        ]
         Effect   = "Allow"
-        Resource = var.state_machine_arn
+        Resource = [var.state_machine_arn,
+        "${replace(var.state_machine_arn, "stateMachine", "execution")}:*"
+        ]
       },
       {
         # SSM Parameter Store

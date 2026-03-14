@@ -71,7 +71,7 @@ def handler(event, context):
         # --- 4. CHAT / ROOT ---
         if normalized_path == "" or normalized_path == "/":
             if method == 'GET':
-                res = dynamodb_resource.Table(TABLE_NAME).query(KeyConditionExpression=boto3.dynamodb.conditions.Key('UserId').eq(user_id), ScanIndexForward=True, Limit=50)
+                res = dynamodb_resource.Table(TABLE_NAME).query(KeyConditionExpression=boto3.dynamodb.conditions.Key('UserId').eq(user_id), ScanIndexForward=False, Limit=50)
                 return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'history': res.get('Items', [])}, cls=DecimalEncoder)}
             
             elif method == 'POST':
@@ -83,15 +83,75 @@ def handler(event, context):
                 b_name = brand_info.get('BrandName', 'Global Brand')
                 b_industry = brand_info.get('Industry', 'Lifestyle')
                 b_tone = brand_info.get('Tone', 'Professional')
-                if any(w in user_prompt.lower() for w in ["create", "generate", "post"]) and any(c.isdigit() for c in user_prompt):
+
+                # ── Fetch last 5 messages for this session as conversation history ──
+                hist_resp = dynamodb_resource.Table(TABLE_NAME).query(
+                    KeyConditionExpression=boto3.dynamodb.conditions.Key('UserId').eq(user_id),
+                    FilterExpression=boto3.dynamodb.conditions.Attr('SessionId').eq(session_id),
+                    ScanIndexForward=False,
+                    Limit=10
+                )
+                past = list(reversed(hist_resp.get('Items', [])))[-5:]  # last 5 pairs
+
+                # Build Nova Lite conversation history
+                conversation = []
+                for h in past:
+                    if h.get('UserMessage'):
+                        conversation.append({"role": "user", "content": [{"text": h['UserMessage']}]})
+                    if h.get('AgentResponse'):
+                        conversation.append({"role": "assistant", "content": [{"text": h['AgentResponse']}]})
+                # Add current message
+                conversation.append({"role": "user", "content": [{"text": user_prompt}]})
+
+                system_instr = (
+                    f"You are VinciFlow Aura, the dedicated Creative Partner for '{b_name}' ({b_industry}). "
+                    f"Your role is to help the brand automate social media content using a {b_tone} tone. "
+                    f"IMPORTANT FLOW: When a user wants to create a post but hasn't given a date/time, "
+                    f"ask them for the schedule time. Once they provide it, confirm back with: "
+                    f"'Got it! I'll generate a post about [TOPIC] scheduled for [TIME]. Preparing your flow now...'. "
+                    f"Do NOT trigger anything yourself — just confirm clearly so the system can detect it."
+                )
+
+                # ── Check if this is a follow-up with timing info ──
+                # Look back in history for pending topic
+                pending_topic = None
+                for h in reversed(past):
+                    agent_resp = h.get('AgentResponse', '').lower()
+                    # Detect if previous assistant message was asking for time
+                    if any(phrase in agent_resp for phrase in ['what time', 'when would you like', 'schedule it', 'provide the time', 'what date']):
+                        pending_topic = h.get('UserMessage', '')
+                        break
+
+                # ── If user is providing time as follow-up to a topic ──
+                has_date = any(w in user_prompt.lower() for w in ['january', 'february', 'march', 'april', 'may', 'june',
+                    'july', 'august', 'september', 'october', 'november', 'december',
+                    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                    'tomorrow', 'tonight', 'today', 'pm', 'am', ':']) or any(c.isdigit() for c in user_prompt)
+
+                is_post_request = any(w in user_prompt.lower() for w in ["create", "generate", "post", "make"])
+
+                # Trigger Step Function if:
+                # 1. Direct request with date in same message
+                # 2. Follow-up providing time after topic was already given
+                should_trigger_sfn = (
+                    (is_post_request and has_date) or
+                    (pending_topic and has_date and not is_post_request)
+                )
+
+                if should_trigger_sfn:
+                    # Build combined prompt from topic + timing if it's a follow-up
+                    if pending_topic and not is_post_request:
+                        combined_prompt = f"{pending_topic} Schedule it for: {user_prompt}"
+                    else:
+                        combined_prompt = user_prompt
+
                     sfn_arn = ssm_client.get_parameter(Name="/vinciflow/dev/state_machine_arn")['Parameter']['Value']
-                    
                     execution = sfn_client.start_execution(
                         stateMachineArn=sfn_arn,
                         input=json.dumps({
                             "userId": user_id,
                             "sessionId": session_id,
-                            "prompt": user_prompt,
+                            "prompt": combined_prompt,  # ✅ full context: topic + time
                             "task": "PARSE",
                             "brandContext": {
                                 "name": brand_info.get('BrandName'),
@@ -102,17 +162,15 @@ def handler(event, context):
                     )
                     execution_arn = execution['executionArn']
 
-                    # ✅ Poll until Step Function finishes (max 25s for API GW timeout)
+                    # Poll for result
                     start = time.time()
                     while time.time() - start < 25:
                         time.sleep(2)
                         desc = sfn_client.describe_execution(executionArn=execution_arn)
-                        status = desc['status']
+                        sfn_status = desc['status']
 
-                        if status == 'SUCCEEDED':
+                        if sfn_status == 'SUCCEEDED':
                             output = json.loads(desc['output'])
-
-                            # AWAIT_CLARIFICATION — return message directly to frontend
                             if output.get('task') == 'AWAIT_CLARIFICATION':
                                 return {
                                     'statusCode': 200,
@@ -120,74 +178,69 @@ def handler(event, context):
                                     'body': json.dumps({
                                         'task': 'AWAIT_CLARIFICATION',
                                         'message': output.get('message'),
-                                        'response': output.get('message')  # so frontend data.response also works
+                                        'response': output.get('message')
                                     })
                                 }
-
-                            # FLOW DONE — frontend will poll DynamoDB via startPolling
                             return {
                                 'statusCode': 200,
                                 'headers': cors_headers,
                                 'body': json.dumps({'message': 'Pipeline Started'})
                             }
-
-                        elif status in ('FAILED', 'TIMED_OUT', 'ABORTED'):
+                        elif sfn_status in ('FAILED', 'TIMED_OUT', 'ABORTED'):
                             return {
                                 'statusCode': 500,
                                 'headers': cors_headers,
-                                'body': json.dumps({'error': f'Pipeline {status}'})
+                                'body': json.dumps({'error': f'Pipeline {sfn_status}'})
                             }
 
-                    # Still running after 25s (image gen is slow) — frontend polls DynamoDB
                     return {
                         'statusCode': 202,
                         'headers': cors_headers,
                         'body': json.dumps({'message': 'Pipeline Started'})
                     }
 
+                # ── Normal conversational response ──────────────────────────────
                 ai_response = ""
                 if file_obj:
                     file_bytes = base64.b64decode(file_obj['data'])
-                    
-                    # 🚀 FIX: Replacing 'Orchestrator' with 'Aura / Creative Partner'
-                    system_instr = (
-                        f"You are VinciFlow Aura, the dedicated Creative Partner for '{b_name}' ({b_industry}). "
-                        f"Your role is to simplify and automate content creation while maintaining a {b_tone} tone. "
-                        f"Remember: You are the assistant helping the brand, not the brand itself. "
-                        f"Be helpful, efficient, and professional."
+                    system_instr_file = (
+                        f"You are VinciFlow Aura, Creative Partner for '{b_name}' ({b_industry}). "
+                        f"Tone: {b_tone}. Analyze the file and help with content creation."
                     )
-                    
                     message_content = []
                     if file_obj['type'] == 'application/pdf':
                         message_content.append({"document": {"name": "doc", "format": "pdf", "source": {"bytes": file_bytes}}})
                     elif file_obj['type'].startswith('image/'):
                         fmt = file_obj['type'].split('/')[-1].replace('jpg', 'jpeg')
                         message_content.append({"image": {"format": fmt, "source": {"bytes": file_bytes}}})
-                    
-                    message_content.append({"text": f"{system_instr}\n\nUser Question: {user_prompt}"})
-                    response = bedrock_runtime.converse(modelId="us.amazon.nova-lite-v1:0", messages=[{"role": "user", "content": message_content}])
+                    message_content.append({"text": f"{system_instr_file}\n\nUser: {user_prompt}"})
+                    response = bedrock_runtime.converse(
+                        modelId="us.amazon.nova-lite-v1:0",
+                        messages=[{"role": "user", "content": message_content}]
+                    )
                     ai_response = response['output']['message']['content'][0]['text']
                 else:
-                    # 🚀 FIX: Refined prompt for Bedrock Agent
-                    injected_prompt = (
-                        f"[SYSTEM: Your identity is VinciFlow Aura, a Creative Partner for {b_name}. "
-                        f"Help them automate their {b_industry} content using a {b_tone} tone. "
-                        f"Always identify as VinciFlow Aura.] {user_prompt}"
+                    # ✅ Pass full conversation history — this IS the memory
+                    response = bedrock_runtime.converse(
+                        modelId="us.amazon.nova-lite-v1:0",
+                        system=[{"text": system_instr}],
+                        messages=conversation  # ✅ full history included
                     )
-                    
-                    response = agent_client.invoke_agent(
-                        agentId=AGENT_ID, agentAliasId=AGENT_ALIAS_ID,
-                        sessionId=session_id, inputText=injected_prompt,
-                        sessionState={'sessionAttributes': {'brandContext': json.dumps({"BrandName": b_name, "Industry": b_industry, "Tone": b_tone})}}
-                    )
-                    ai_response = "".join([chunk.get('chunk', {}).get('bytes', b'').decode('utf-8') for chunk in response.get('completion')])
+                    ai_response = response['output']['message']['content'][0]['text']
 
-                # Save Memory
+                # Save to DynamoDB
                 dynamodb_resource.Table(TABLE_NAME).put_item(Item={
-                    'UserId': user_id, 'Timestamp': int(time.time()), 'SessionId': session_id,
-                    'UserMessage': user_prompt, 'AgentResponse': ai_response
+                    'UserId': user_id,
+                    'Timestamp': int(time.time()),
+                    'SessionId': session_id,
+                    'UserMessage': user_prompt,
+                    'AgentResponse': ai_response
                 })
-                return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'response': ai_response, 'sessionId': session_id})}
+                return {
+                    'statusCode': 200,
+                    'headers': cors_headers,
+                    'body': json.dumps({'response': ai_response, 'sessionId': session_id})
+                }
 
         return {'statusCode': 404, 'headers': cors_headers, 'body': json.dumps({'error': f"Route {path} Not Found"})}
     except Exception as e:
