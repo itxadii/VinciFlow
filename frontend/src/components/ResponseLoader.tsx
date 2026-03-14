@@ -8,7 +8,7 @@ const ResponseLoader: React.FC<ResponseLoaderProps> = ({ isGenerating = false })
   return (
     <div className="flex justify-start my-4 items-center">
       <div 
-        className="w-8 h-8 rounded-full animate-spin shadow-sm flex-shrink-0" 
+        className="w-8 h-8 rounded-full animate-spin shadow-sm shrink-0" 
         style={{
           background: 'conic-gradient(#FF4B8B 0% 25%, #8E75C2 25% 50%, #00C2FF 50% 75%, #FFD700 75% 100%)',
           maskImage: 'radial-gradient(circle, transparent 65%, black 65%)',

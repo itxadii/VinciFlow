@@ -29,6 +29,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isGeneratingFlow, setIsGeneratingFlow] = useState(false);
   const isGeneratingFlowRef = useRef(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const setGeneratingFlow = (val: boolean) => {
     isGeneratingFlowRef.current = val;
@@ -55,7 +56,12 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
       setRightPanelWidth(newWidth);
     }
   }, []);
-
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  
   useEffect(() => {
     window.addEventListener('mousemove', resize);
     window.addEventListener('mouseup', stopResizing);
@@ -125,20 +131,20 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
       const historyData = await getChatHistory();
       const sessionItems = historyData.filter((m: any) => m.SessionId === sid);
 
-      // ✅ Chat messages — exclude flow items and stale pipeline messages
       const chatMsgs: Message[] = sessionItems
         .filter((m: any) => !m.Status)
         .filter((m: any) =>
           !m.AgentResponse?.includes('Generating your content flow') &&
           !m.AgentResponse?.includes('Preparing your flow') &&
-          !m.AgentResponse?.startsWith('⏳')  // ✅ filter placeholder
+          !m.AgentResponse?.startsWith('⏳')
         )
         .flatMap((m: any) => [
           { role: 'user' as const, content: m.UserMessage, id: uuidv4(), timestamp: Number(m.Timestamp) },
           { role: 'assistant' as const, content: m.AgentResponse, id: uuidv4(), timestamp: Number(m.Timestamp) }
         ]);
 
-      // ✅ Flow items
+      setMessages(chatMsgs); // ✅ this line was missing
+
       const flows = sessionItems.filter((m: any) =>
         m.Status === 'DRAFT' || m.Status === 'SCHEDULED' || m.Status === 'PUBLISHED'
       );
@@ -255,6 +261,14 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
       toast.error("Failed to sync with EventBridge.", { id: toastId });
     }
   };
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-[#f9f9f8] flex flex-col items-center justify-center px-8 text-center">
+        <h2 className="text-2xl font-bold text-slate-800 font-['Handlee'] mb-3">VinciFlow</h2>
+        <p className="font-['Montserrat'] text-slate-400 text-sm">Please use a desktop browser for the full experience.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex w-full h-screen overflow-hidden font-['Montserrat'] relative bg-[#f9f9f8] m-0 p-0">

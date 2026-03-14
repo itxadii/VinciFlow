@@ -2,41 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { signIn, getCurrentUser } from 'aws-amplify/auth';
 import { useNavigate, Link } from 'react-router-dom';
 import FloatingIcons from '../../components/FloatingIcons';
-// Import the brand check function
-// import { getBrandProfile } from '../../services/brandApi';
 
 export default function CustomLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [checkingAuth, setCheckingAuth] = useState(true); 
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
 
-  // 1. Unified Navigation Logic
-const navigateBasedOnBrand = async () => {
-  // --- DEV BYPASS: Seedha chat par bhejo ---
-  navigate('/chat', { replace: true }); 
-  
-  /* // Prod logic (Baad mein use karna jab data fill kar lo)
-  try {
-    const brandData = await getBrandProfile();
-    if (brandData && brandData.BrandName) {
-      navigate('/chat', { replace: true });
-    } else {
-      navigate('/onboarding', { replace: true });
-    }
-  } catch (err) {
-    navigate('/onboarding', { replace: true });
-  }
-  */
-};
+  // ✅ Detect mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
-  // 2. Auto-login check
+  const navigateBasedOnBrand = async () => {
+    navigate('/chat', { replace: true });
+  };
+
   useEffect(() => {
     const checkUser = async () => {
       try {
         await getCurrentUser();
-        await navigateBasedOnBrand(); // Use the smart check
+        await navigateBasedOnBrand();
       } catch (err) {
         setCheckingAuth(false);
       }
@@ -46,22 +37,54 @@ const navigateBasedOnBrand = async () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); // Clear previous errors
+    setError('');
     try {
       const { isSignedIn } = await signIn({ username: email, password });
-      if (isSignedIn) {
-        await navigateBasedOnBrand(); // Use the smart check
-      }
+      if (isSignedIn) await navigateBasedOnBrand();
     } catch (err: any) {
       setError(err.message || "Login failed. Check your credentials.");
     }
   };
 
-  // Auth check UI
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-[#f9f9f8] flex items-center justify-center">
         <div className="animate-pulse font-['Handlee'] text-slate-400">Verifying session & brand aura...</div>
+      </div>
+    );
+  }
+
+  // ✅ Mobile block screen
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-[#f9f9f8] flex flex-col items-center justify-center px-8 text-center">
+        <div className="mb-8">
+          <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-slate-200">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 font-['Handlee'] mb-3">
+            VinciFlow
+          </h2>
+          <p className="font-['Merriweather'] font-bold text-slate-700 text-base mb-2">
+            Desktop only for now
+          </p>
+          <p className="font-['Montserrat'] text-slate-400 text-sm leading-relaxed">
+            VinciFlow is optimized for desktop and laptop screens. Please open it on your PC or Mac for the full experience.
+          </p>
+        </div>
+
+        <div className="bg-white/60 backdrop-blur-sm border border-slate-200 rounded-2xl px-6 py-4 w-full max-w-xs">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300 mb-1">Coming Soon</p>
+          <p className="text-sm font-['Merriweather'] font-bold text-slate-500">Mobile app in the works ✦</p>
+        </div>
+
+        <p className="mt-10 text-[10px] text-slate-300 font-black uppercase tracking-[0.4em]">
+          Powered by VinciFlow Engine v1.0
+        </p>
       </div>
     );
   }
