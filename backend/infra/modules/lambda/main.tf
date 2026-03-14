@@ -72,6 +72,7 @@ resource "aws_lambda_function" "pipeline_lambda" {
       DYNAMODB_TABLE_NAME = var.dynamodb_table
       BRANDS_TABLE_NAME   = var.brands_table_name
       GEMINI_API_KEY      = var.gemini_api_key
+      ASSETS_BUCKET_NAME  = var.assets_bucket_name
     }
   }
 }

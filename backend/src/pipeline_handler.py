@@ -37,51 +37,70 @@ def fetch_logo(logo_url: str):
     except Exception:
         return None
 
-def apply_branding(image_bytes: bytes, logo_url: str | None, brand_name: str) -> bytes:
+def apply_branding(image_bytes: bytes, logo_url: str | None, brand_name: str, user_id: str = None) -> bytes:
     base = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     W, H = base.size
 
-    # Semi-transparent bottom bar
-    bar_h = int(H * 0.10)
-    bar = Image.new("RGBA", (W, bar_h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(bar)
-    for y in range(bar_h):
-        alpha = int(180 * (y / bar_h))
-        draw.line([(0, y), (W, y)], fill=(0, 0, 0, alpha))
-    base.paste(bar, (0, H - bar_h), bar)
+    logo = None
 
-    # Brand name text
-    draw = ImageDraw.Draw(base)
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size=36)
-    except Exception:
-        font = ImageFont.load_default()
+    # ✅ Try PNG then JPG only
+    if user_id:
+        for ext in ['png', 'jpg']:
+            try:
+                s3_key = f"logos/{user_id}_logo.{ext}"
+                s3_obj = s3_client.get_object(Bucket=ASSETS_BUCKET, Key=s3_key)
+                logo = Image.open(io.BytesIO(s3_obj['Body'].read())).convert("RGBA")
+                print(f"Logo loaded: {s3_key}")
+                break
+            except Exception:
+                continue
 
-    text = brand_name.upper()
-    bbox = draw.textbbox((0, 0), text, font=font)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    tx = (W - tw) // 2
-    ty = H - bar_h + (bar_h - th) // 2
-    draw.text((tx + 2, ty + 2), text, font=font, fill=(0, 0, 0, 120))  # shadow
-    draw.text((tx, ty), text, font=font, fill=(255, 255, 255, 230))
+    # Fallback — logoUrl from brandContext
+    if not logo and logo_url:
+        try:
+            r = requests.get(logo_url, timeout=10)
+            r.raise_for_status()
+            logo = Image.open(io.BytesIO(r.content)).convert("RGBA")
+        except Exception as e:
+            print(f"Logo URL fetch failed: {e}")
 
-    # Logo bottom-right
-    if logo_url:
-        logo = fetch_logo(logo_url)
-        if logo:
-            logo_size = int(H * 0.12)
-            logo = logo.resize((logo_size, logo_size), Image.LANCZOS)
-            base.paste(logo, (W - logo_size - 20, H - logo_size - 20), logo)
+    # ── Place logo bottom-right or fallback to text ───────────────
+    if logo:
+        logo_size = int(H * 0.10)
+        logo = logo.resize((logo_size, logo_size), Image.LANCZOS)
+        margin = 20
+        lx = W - logo_size - margin
+        ly = H - logo_size - margin
+        draw = ImageDraw.Draw(base)
+        draw.ellipse(
+            [lx - 6, ly - 6, lx + logo_size + 6, ly + logo_size + 6],
+            fill=(255, 255, 255, 180)
+        )
+        base.paste(logo, (lx, ly), logo)
+    else:
+        # Text fallback bottom-right
+        draw = ImageDraw.Draw(base)
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size=28)
+        except Exception:
+            font = ImageFont.load_default()
+        text = brand_name.upper()
+        bbox = draw.textbbox((0, 0), text, font=font)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        margin = 20
+        tx, ty = W - tw - margin, H - th - margin
+        draw.rectangle([tx - 8, ty - 6, tx + tw + 8, ty + th + 6], fill=(0, 0, 0, 120))
+        draw.text((tx, ty), text, font=font, fill=(255, 255, 255, 220))
 
     buf = io.BytesIO()
     base.convert("RGB").save(buf, format="PNG", optimize=True)
     return buf.getvalue()
 
 # ─────────────────────────────────────────────
-# S3 UPLOAD — uses ASSETS_BUCKET + s3_client from utils
+# S3 UPLOAD
 # ─────────────────────────────────────────────
 
-def upload_to_s3(image_bytes: bytes, user_id: str, session_id: str, suffix: str = "final") -> str:
+def upload_to_s3(image_bytes: bytes, user_id: str, session_id: str, suffix: str = "final") -> tuple[str, str]:
     key = f"generated/{user_id}/{session_id}/{int(time.time())}_{suffix}.png"
     s3_client.put_object(
         Bucket=ASSETS_BUCKET,
@@ -89,17 +108,21 @@ def upload_to_s3(image_bytes: bytes, user_id: str, session_id: str, suffix: str 
         Body=image_bytes,
         ContentType="image/png"
     )
-    return s3_client.generate_presigned_url(
+    url = s3_client.generate_presigned_url(
         'get_object',
         Params={'Bucket': ASSETS_BUCKET, 'Key': key},
-        ExpiresIn=604800  # 7 days
+        ExpiresIn=604800
     )
+    return url, key  # ✅ return both
 
 # ─────────────────────────────────────────────
 # HANDLER
 # ─────────────────────────────────────────────
 
 def handler(event, context):
+    if event.get('status') == 'error':
+        return event
+
     task = event.get('task', 'PARSE')
     user_id = event.get('userId')
     session_id = event.get('sessionId')
@@ -129,28 +152,33 @@ def handler(event, context):
             Year: 2026
 
             Role: Social Media Architect & Scheduling Interpreter.
-            Your job is to analyze the user's message and extract:
-            1. TOPIC of the content (campaign, promotion, festival, announcement, etc.)
-            2. SCHEDULE time.
 
-            STRICT RULES FOR SCHEDULE:
-            - All schedules MUST be returned in ISO-8601 format (YYYY-MM-DDTHH:mm:ss) in IST.
-            - Do NOT convert to UTC. Do NOT append offsets.
-            - Convert natural language (e.g. 9:51 PM) into 24-hour format.
+            CRITICAL: If the user message contains ANY date or time information — even approximate like "tomorrow", "6pm", "March 22", "next Monday" — you MUST return status: READY. NEVER ask for time if any time hint exists in the message.
 
-            LOGIC:
-            1. Detect campaign topic. 2. Detect date/time. 3. Normalize to IST.
-            4. If missing time -> status = NEED_TIME.
-            5. If both exist -> generate FinalPrompt instructing content generator for platform-ready posts.
+            Your job:
+            1. Extract TOPIC (campaign, promotion, festival, announcement)
+            2. Extract SCHEDULE time — be aggressive, extract even partial times
 
-            OUTPUT RULES: Return ONLY valid JSON. No markdown, no backticks.
-            JSON FORMAT: {{
-              "status": "READY" | "NEED_TIME",
-              "topic": "...",
-              "schedule": "YYYY-MM-DDTHH:mm:ss",
-              "finalPrompt": "...",
-              "imagePrompt": "Photorealistic high-resolution social media ad image. Describe exact scene, lighting, colors, mood, objects relevant to topic. No text in image.",
-              "askUser": "..."
+            SCHEDULE RULES:
+            - Return ISO-8601 format: YYYY-MM-DDTHH:mm:ss in IST
+            - Do NOT convert to UTC, do NOT append offsets
+            - "6:00 pm" = 18:00:00
+            - "6 pm" = 18:00:00
+            - "tomorrow 6pm" = next day 18:00:00
+
+            DECISION RULES:
+            - Has date AND time in any form → status: READY
+            - Has date but NO time → status: READY, use 12:00:00 as default
+            - Has ZERO date/time info → status: NEED_TIME
+
+            OUTPUT: Return ONLY valid JSON. No markdown, no backticks.
+            {{
+            "status": "READY" | "NEED_TIME",
+            "topic": "...",
+            "schedule": "YYYY-MM-DDTHH:mm:ss",
+            "finalPrompt": "...",
+            "imagePrompt": "Photorealistic high-resolution social media ad image. Describe exact scene, lighting, colors, mood, objects relevant to topic. No text in image.",
+            "askUser": "..."
             }}
             """
 
@@ -181,15 +209,24 @@ def handler(event, context):
 
         # ── GENERATE ───────────────────────────────────────────────────
         if task == "GENERATE":
+            api_key = get_gemini_key()
+            print(f"DEBUG | api_key present: {bool(api_key)}")
+            print(f"DEBUG | image_prompt: {event.get('imagePrompt')}")
+            print(f"DEBUG | topic: {event.get('topic')}")
+
+            if not api_key:
+                return {"status": "error", "message": "Gemini API key not found in SSM"}
+
             brand_name = brand_ctx.get('name', 'Global Brand')
             tone = brand_ctx.get('tone', 'Professional')
-            topic = event.get('posts', [{}])[0].get('topic', '')
+            topic = event.get('topic') or event.get('posts', [{}])[0].get('topic', '')
+            date = event.get('date') or event.get('posts', [{}])[0].get('date', '')
             image_prompt = event.get('imagePrompt') or (
                 f"A stunning photorealistic social media advertisement for {brand_name}. "
                 f"Theme: {topic}. Style: {tone.lower()}, premium, no text overlays."
             )
 
-            genai.configure(api_key=get_gemini_key())
+            genai.configure(api_key=api_key)
 
             # 1. Caption
             model = genai.GenerativeModel('gemini-2.5-flash')
@@ -199,17 +236,22 @@ def handler(event, context):
             )
 
             # 2. Image
-            raw_image_bytes = generate_image_gemini(image_prompt, get_gemini_key())
+            raw_image_bytes = generate_image_gemini(image_prompt, api_key)
 
-            # 3. Upload raw to S3
-            raw_image_url = upload_to_s3(raw_image_bytes, user_id, session_id, suffix="raw")
+            # 3. Upload raw to S3 — unpack both url and key ✅
+            raw_image_url, raw_image_key = upload_to_s3(raw_image_bytes, user_id, session_id, suffix="raw")
 
             return {
-                **event,
+                # ✅ Only pass what downstream tasks need — drop heavy/unused fields
+                "task": "BRAND",
+                "userId": user_id,
+                "sessionId": session_id,
+                "brandContext": brand_ctx,
                 "rawContent": caption_response.text,
                 "rawImageUrl": raw_image_url,
-                "rawImageBytes": base64.b64encode(raw_image_bytes).decode(),
-                "task": "BRAND"
+                "rawImageS3Key": raw_image_key,
+                "posts": [{"date": date, "topic": topic, "type": "IMAGE"}],
+                # intentionally NOT spreading **event — avoids carrying imagePrompt, prompt, type etc.
             }
 
         # ── BRAND ──────────────────────────────────────────────────────
@@ -224,38 +266,57 @@ def handler(event, context):
                 .strip()
             )
 
-            raw_image_bytes = base64.b64decode(event.get('rawImageBytes', ''))
+            raw_image_s3_key = event.get('rawImageS3Key')
+            if raw_image_s3_key:
+                s3_obj = s3_client.get_object(Bucket=ASSETS_BUCKET, Key=raw_image_s3_key)
+                raw_image_bytes = s3_obj['Body'].read()
+            else:
+                raw_image_bytes = base64.b64decode(event.get('rawImageBytes', ''))
+
             branded_bytes = apply_branding(raw_image_bytes, logo_url, brand_name)
-            branded_image_url = upload_to_s3(branded_bytes, user_id, session_id, suffix="branded")
+            branded_image_url, _ = upload_to_s3(branded_bytes, user_id, session_id, suffix="branded")  # ✅ unpack
 
             return {
-                **event,
+                # ✅ Only pass what STORE needs
+                "task": "STORE",
+                "userId": user_id,
+                "sessionId": session_id,
                 "finalContent": clean_content,
                 "finalImageUrl": branded_image_url,
-                "rawImageBytes": None,  # clear heavy payload
-                "task": "STORE"
+                "rawImageUrl": event.get('rawImageUrl'),
+                "posts": event.get('posts', []),
             }
-
         # ── STORE ──────────────────────────────────────────────────────
         if task == "STORE":
             post = event.get('posts', [{}])[0]
+            topic = post.get('topic', 'your campaign')
+            scheduled_date = post.get('date', '')
+            brand_name = brand_ctx.get('name', 'Brand') if brand_ctx else 'Brand'
+
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(scheduled_date)
+                formatted_date = dt.strftime("%-d %B %Y at %-I:%M %p IST")
+            except Exception:
+                formatted_date = scheduled_date
+
+            personalized_msg = (
+                f"✦ {brand_name} · {topic.title()}\n"
+                f"Scheduled for {formatted_date}"
+            )
+
             dynamodb_resource.Table(TABLE_NAME).put_item(Item={
                 'UserId': user_id,
                 'Timestamp': int(time.time()),
                 'SessionId': session_id,
-                'UserMessage': f"📅 Drafted Flow: {post.get('date')}",
-                'AgentResponse': event.get('finalContent'),
+                'UserMessage': f"📅 {topic.title()}",
+                'AgentResponse': personalized_msg,       # ✅ shown in chat history
+                'PostContent': event.get('finalContent'), # ✅ actual caption for ResultCard
                 'ScheduledDate': post.get('date'),
                 'ImageUrl': event.get('finalImageUrl'),
                 'RawImageUrl': event.get('rawImageUrl'),
                 'Status': 'DRAFT'
             })
-            return {
-                "status": "success",
-                "imageUrl": event.get('finalImageUrl'),
-                "content": event.get('finalContent'),
-                "scheduledDate": post.get('date')
-            }
 
     except Exception as e:
         traceback.print_exc()

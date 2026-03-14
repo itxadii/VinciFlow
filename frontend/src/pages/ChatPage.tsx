@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { PanelLeftOpen, X, Sparkles } from 'lucide-react'; 
+import { PanelLeftOpen, X, Sparkles } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import MessageList from '../components/MessageList';
 import ChatInput from '../components/ChatInput';
 import ResultCard from '../components/GeneratedResults';
-import { sendMessageToBackend, getChatHistory, apiClient } from '../services/api'; // Added updateFlowStatus
+import { sendMessageToBackend, getChatHistory, apiClient } from '../services/api';
 import { convertToBase64 } from '../utils/file';
 import type { Message, ChatRequest } from '../types/chat';
-import { getBrandProfile } from '../services/brandApi'; 
-import { useNavigate, useSearchParams } from 'react-router-dom'; 
-import { toast } from 'react-hot-toast'; 
+import { getBrandProfile } from '../services/brandApi';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 
 const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, user }) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -20,18 +20,22 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [sessions, setSessions] = useState<{ sessionId: string; lastMsg: string }[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState(uuidv4());
-  
-  const [showResults, setShowResults] = useState(false); // Default false until flow starts
-  const [generatedItems, setGeneratedItems] = useState<any[]>([]); // Using real data instead of mock
-  const [rightPanelWidth, setRightPanelWidth] = useState(450); 
+  const [showResults, setShowResults] = useState(false);
+  const [generatedItems, setGeneratedItems] = useState<any[]>([]);
+  const [rightPanelWidth, setRightPanelWidth] = useState(450);
   const isResizing = useRef(false);
-  
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isGeneratingFlow, setIsGeneratingFlow] = useState(false);
+  const isGeneratingFlowRef = useRef(false);
 
-  // --- 1. RESIZING LOGIC (UNTOUCHED) ---
+  const setGeneratingFlow = (val: boolean) => {
+    isGeneratingFlowRef.current = val;
+    setIsGeneratingFlow(val);
+  };
+
+  // --- 1. RESIZING LOGIC ---
   const startResizing = useCallback(() => {
     isResizing.current = true;
     document.body.style.cursor = 'col-resize';
@@ -61,7 +65,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
     };
   }, [resize, stopResizing]);
 
-  // --- 2. AUTH & BRAND SYNC (UNTOUCHED) ---
+  // --- 2. AUTH & BRAND SYNC ---
   useEffect(() => {
     const code = searchParams.get('code');
     const state = searchParams.get('state');
@@ -74,7 +78,8 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
             toast.success("X Account Linked! 🚀");
             navigate('/chat', { replace: true });
           }
-        } catch (error) { toast.error("Aura Sync Failed."); } finally { setIsLoading(false); }
+        } catch (error) { toast.error("Aura Sync Failed."); }
+        finally { setIsLoading(false); }
       };
       handleXCallback();
     }
@@ -94,16 +99,21 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
   useEffect(() => { loadSessions(); }, [user]);
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading]);
 
-  // --- 3. UPDATED DATA FETCHING (CHAT VS FLOWS) ---
+  // --- 3. DATA FETCHING ---
   const loadSessions = async () => {
     try {
       const history = await getChatHistory();
       if (history && Array.isArray(history)) {
-        const uniqueSessions = Array.from(new Set(history.map((m: any) => m.SessionId)))
+        // ✅ Sort oldest first so first message per session is the original topic
+        const sorted = [...history].sort((a, b) => Number(a.Timestamp) - Number(b.Timestamp));
+        
+        const uniqueSessions = Array.from(new Set(sorted.map((m: any) => m.SessionId)))
           .map(id => ({
             sessionId: id as string,
-            lastMsg: history.find((m: any) => m.SessionId === id)?.UserMessage || "New Flow"
+            // ✅ Use FIRST user message — stable, doesn't change
+            lastMsg: sorted.find((m: any) => m.SessionId === id && m.UserMessage)?.UserMessage || "New Flow"
           }));
+
         setSessions(uniqueSessions);
       }
     } catch (e) { console.error(e); }
@@ -115,46 +125,71 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
       const historyData = await getChatHistory();
       const sessionItems = historyData.filter((m: any) => m.SessionId === sid);
 
-      // Separate Normal Messages
+      // ✅ Chat messages — exclude flow items and stale pipeline messages
       const chatMsgs: Message[] = sessionItems
-        .filter((m: any) => !m.Status) // Chat items don't have Status key
+        .filter((m: any) => !m.Status)
+        .filter((m: any) =>
+          !m.AgentResponse?.includes('Generating your content flow') &&
+          !m.AgentResponse?.includes('Preparing your flow') &&
+          !m.AgentResponse?.includes('⏳')
+        )
         .flatMap((m: any) => [
           { role: 'user' as const, content: m.UserMessage, id: uuidv4(), timestamp: Number(m.Timestamp) },
           { role: 'assistant' as const, content: m.AgentResponse, id: uuidv4(), timestamp: Number(m.Timestamp) }
         ]);
       setMessages(chatMsgs);
 
-      // Separate Flow Drafts
-      const flows = sessionItems.filter((m: any) => m.Status === 'DRAFT' || m.Status === 'SCHEDULED');
+      // ✅ Flow items
+      const flows = sessionItems.filter((m: any) =>
+        m.Status === 'DRAFT' || m.Status === 'SCHEDULED' || m.Status === 'PUBLISHED'
+      );
       setGeneratedItems(flows);
-      if (flows.length > 0) setShowResults(true);
-      else setShowResults(false);
+      setShowResults(flows.length > 0);
 
     } catch (e) { console.error(e); }
   };
 
-  // --- 4. POLLING FOR STEP FUNCTIONS ---
+  // --- 4. POLLING ---
   const startPolling = (sid: string) => {
     let attempts = 0;
     const interval = setInterval(async () => {
       attempts++;
-      const history = await getChatHistory();
-      const flows = history.filter((m: any) => m.SessionId === sid && m.Status === 'DRAFT');
-      
-      if (flows.length > 0 || attempts > 15) {
-        setGeneratedItems(flows);
-        setShowResults(true);
-        setIsGeneratingFlow(false);
-        clearInterval(interval);
+      try {
+        const history = await getChatHistory();
+        const flows = history.filter((m: any) => m.SessionId === sid && m.Status === 'DRAFT');
+
+        if (flows.length > 0) {
+          setGeneratedItems(flows);
+          setShowResults(true);
+          setGeneratingFlow(false);
+          setIsLoading(false);
+          clearInterval(interval);
+        } else if (attempts > 15) {
+          setGeneratingFlow(false);
+          setIsLoading(false);
+          setMessages(prev => [...prev, {
+            id: uuidv4(), role: 'assistant',
+            content: '❌ Generation timed out. Please try again.',
+            timestamp: Date.now()
+          }]);
+          clearInterval(interval);
+        }
+      } catch (e) {
+        console.error('Polling error:', e);
       }
     }, 3000);
   };
 
+  // --- SEND ---
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!input.trim() && !selectedFile) || isLoading) return;
+
     const userMsgText = input;
     setMessages(prev => [...prev, { id: uuidv4(), role: 'user', content: input, timestamp: Date.now() }]);
+    setInput('');
+    setSelectedFile(null);
+    setGeneratingFlow(false);
     setIsLoading(true);
 
     try {
@@ -163,83 +198,72 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
 
       const data = await sendMessageToBackend(payload);
 
-      // CLARIFICATION — show message, stop loader, return early
-      if ((data as any).type === 'AWAIT_CLARIFICATION') {
+      if ((data as any).task === 'AWAIT_CLARIFICATION') {
         setMessages(prev => [...prev, {
-          id: uuidv4(),
-          role: 'assistant',
+          id: uuidv4(), role: 'assistant',
           content: (data as any).message || "Could you provide more details?",
           timestamp: Date.now()
         }]);
-        return; // ✅ exits try, finally still runs (clears input/loading — correct)
+        return;
       }
 
-      // PIPELINE STARTED — switch to generating loader, start polling, no aiMsg
       if ((data as any).message === 'Pipeline Started') {
         toast.success("Synthesis Started... ⚡");
-        setIsGeneratingFlow(true); // ✅ switches loader to "Generating post flow..."
-        setIsLoading(true);        // ✅ keep loader alive during polling (finally will NOT kill it now — see below)
+        setGeneratingFlow(true);
         startPolling(currentSessionId);
-        return; // ✅ skip generic aiMsg
+        return;
       }
 
-      // DEFAULT — normal chat response
       setMessages(prev => [...prev, {
-        id: uuidv4(),
-        role: 'assistant',
+        id: uuidv4(), role: 'assistant',
         content: data.response || data.message || "I'm here to help!",
         timestamp: Date.now()
       }]);
 
     } catch (error) {
       console.error(error);
+      setGeneratingFlow(false);
       setMessages(prev => [...prev, {
-        id: uuidv4(),
-        role: 'assistant',
+        id: uuidv4(), role: 'assistant',
         content: '❌ Something went wrong. Please try again.',
         timestamp: Date.now()
       }]);
     } finally {
-      // Only clear loading if NOT generating a flow (polling manages its own state)
-      if (!isGeneratingFlow) setIsLoading(false);
+      if (!isGeneratingFlowRef.current) {
+        setIsLoading(false);
+      }
       setInput('');
       setSelectedFile(null);
     }
   };
 
-  // --- 5. ACCEPT/REJECT HANDLERS ---
-  const handleAcceptFlow = async (item: any) => {
-  // 1. Loading state for specific item (Optional toast)
-  const toastId = toast.loading("Scheduling Aura Flow...");
-  
-  try {
-    // 2. Call API with timestamp, session, and the target time
-    await apiClient.post('/schedule', {
-      timestamp: item.Timestamp,
-      sessionId: item.SessionId,
-      status: 'SCHEDULED',
-      scheduledTime: item.ScheduledDate // 🚀 LLM parsed this earlier
-    });
-
-    toast.success("Post successfully locked & scheduled! 🚀", { id: toastId });
-    
-    // 3. UI Sync: Refresh data to show the 'Scheduled' badge
-    loadSpecificChat(currentSessionId); 
-    
-  } catch (err) {
-    console.error("Scheduling failed:", err);
-    toast.error("Failed to sync with EventBridge.", { id: toastId });
-  }
+  // --- 5. ACCEPT/REJECT --- ✅ platforms param added
+  const handleAcceptFlow = async (item: any, platforms: string[] = ['X']) => {
+    const toastId = toast.loading("Scheduling Aura Flow...");
+    try {
+      await apiClient.post('/schedule', {
+        timestamp: item.Timestamp,
+        sessionId: item.SessionId,
+        status: 'SCHEDULED',
+        scheduledTime: item.ScheduledDate,
+        platforms
+      });
+      toast.success("Post successfully locked & scheduled! 🚀", { id: toastId });
+      loadSpecificChat(currentSessionId);
+    } catch (err) {
+      console.error("Scheduling failed:", err);
+      toast.error("Failed to sync with EventBridge.", { id: toastId });
+    }
   };
 
   return (
     <div className="flex w-full h-screen overflow-hidden font-['Montserrat'] relative bg-[#f9f9f8] m-0 p-0">
-      
+
       <div className="bg-[#F8F3E1] border-r border-[#E3DBBB]">
-        <Sidebar 
+        <Sidebar
           isOpen={isSidebarOpen} setIsOpen={setSidebarOpen}
           sessions={sessions} currentSessionId={currentSessionId}
-          onSelectSession={loadSpecificChat} 
+          onSelectSession={loadSpecificChat}
           onNewChat={() => { setCurrentSessionId(uuidv4()); setMessages([]); setShowResults(false); }}
           userEmail={user?.signInDetails?.loginId} onSignOut={signOut}
         />
@@ -255,24 +279,24 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
 
           {messages.length === 0 && !isLoading && (
             <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center w-full z-0 px-6">
-               <h1 className="text-5xl md:text-6xl font-['Merriweather'] font-bold text-slate-800 mb-6 tracking-tight">
-                 Back at it, <span className="font-['Handlee'] text-slate-600">{user?.signInDetails?.loginId?.split('@')[0] || "Creative"}</span>
-               </h1>
+              <h1 className="text-5xl md:text-6xl font-['Merriweather'] font-bold text-slate-800 mb-6 tracking-tight">
+                Back at it, <span className="font-['Handlee'] text-slate-600">{user?.signInDetails?.loginId?.split('@')[0] || "Creative"}</span>
+              </h1>
             </div>
           )}
 
-          <MessageList messages={messages} isLoading={isLoading} scrollRef={scrollRef} isGeneratingFlow={isGeneratingFlow}/>
+          <MessageList messages={messages} isLoading={isLoading} scrollRef={scrollRef} isGeneratingFlow={isGeneratingFlow} />
           <ChatInput input={input} setInput={setInput} onSend={handleSend} selectedFile={selectedFile} setSelectedFile={setSelectedFile} isLoading={isLoading} />
         </div>
 
         {showResults && (
           <div onMouseDown={startResizing} className="w-1.5 h-full cursor-col-resize bg-[#E3DBBB] hover:bg-slate-400 transition-colors z-50 flex items-center justify-center group">
-             <div className="w-px h-10 bg-white/40 group-hover:bg-white" />
+            <div className="w-px h-10 bg-white/40 group-hover:bg-white" />
           </div>
         )}
 
         {showResults && (
-          <aside 
+          <aside
             style={{ width: `${rightPanelWidth}px` }}
             className="hidden md:flex flex-col bg-[#F8F3E1] border-l border-[#E3DBBB] overflow-hidden animate-in slide-in-from-right duration-500"
           >
@@ -289,17 +313,17 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
             <div className="flex-1 overflow-y-auto p-8 pt-0 space-y-8 no-scrollbar pb-24">
               {generatedItems.length === 0 && <p className="text-slate-400 text-center py-10">Synthesizing your flows...</p>}
               {generatedItems.map((item) => (
-              <ResultCard 
-                key={item.Timestamp}
-                image={item.ImageUrl || 'https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png'}
-                content={item.AgentResponse}
-                hashtags={[]}
-                status={item.Status}
-                scheduledDate={item.ScheduledDate} // 🚀 Pass the date to the card
-                onAccept={() => handleAcceptFlow(item)}
-                onReject={() => setGeneratedItems(prev => prev.filter(i => i.Timestamp !== item.Timestamp))}
-              />
-            ))}
+                <ResultCard
+                  key={item.Timestamp}
+                  image={item.ImageUrl || 'https://developers.elementor.com/docs/assets/img/elementor-placeholder-image.png'}
+                  content={item.PostContent || item.AgentResponse}  // ✅ PostContent first
+                  hashtags={[]}
+                  status={item.Status}
+                  scheduledDate={item.ScheduledDate}
+                  onAccept={(platforms) => handleAcceptFlow(item, platforms)}
+                  onReject={() => setGeneratedItems(prev => prev.filter(i => i.Timestamp !== item.Timestamp))}
+                />
+              ))}
             </div>
           </aside>
         )}

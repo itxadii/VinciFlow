@@ -49,8 +49,8 @@ const Onboarding: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       // SVG, PNG, JPG validation
-      if (!['image/svg+xml', 'image/png', 'image/jpeg'].includes(file.type)) {
-        toast.error("Please upload an SVG, PNG, or JPG file.");
+      if (!['image/png', 'image/jpeg'].includes(file.type)) {
+        toast.error("Please upload a PNG or JPG file.");
         return;
       }
 
@@ -187,7 +187,7 @@ const Onboarding: React.FC = () => {
                   {formData.LogoUrl ? `File: ${formData.LogoUrl}` : "Upload Brand Logo"}
                 </p>
                 <p className="text-xs text-slate-400">SVG, PNG, or JPG (Max 5MB)</p>
-                <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleLogoUpload} accept=".svg,.png,.jpg,.jpeg" />
+                <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleLogoUpload} accept="image/png, image/jpeg" />
               </div>
               {formData.logoBase64 && <CheckCircle2 className="text-green-500" size={20} />}
             </div>

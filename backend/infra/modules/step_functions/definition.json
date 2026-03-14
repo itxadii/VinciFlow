@@ -27,6 +27,7 @@
       "Type": "Map",
       "ItemsPath": "$.posts",
       "ItemSelector": {
+        "task": "GENERATE",
         "topic.$": "$$.Map.Item.Value.topic",
         "date.$": "$$.Map.Item.Value.date",
         "type.$": "$$.Map.Item.Value.type",
@@ -34,7 +35,7 @@
         "sessionId.$": "$.sessionId",
         "brandContext.$": "$.brandContext",
         "prompt.$": "$.prompt",
-        "task": "GENERATE" 
+        "imagePrompt.$": "$.imagePrompt"
       },
       "MaxConcurrency": 5,
       "Iterator": {
@@ -51,17 +52,53 @@
                 "BackoffRate": 2.0
               }
             ],
+            "Catch": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "Next": "GenerateFailed",
+                "ResultPath": "$.error"
+              }
+            ],
             "Next": "ApplyBranding"
+          },
+          "GenerateFailed": {
+            "Type": "Fail",
+            "Error": "GenerateContentFailed",
+            "Cause": "Image or caption generation failed"
           },
           "ApplyBranding": {
             "Type": "Task",
             "Resource": "${arn_lambda_branding}",
+            "Catch": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "Next": "BrandingFailed",
+                "ResultPath": "$.error"
+              }
+            ],
             "Next": "StoreDraft"
+          },
+          "BrandingFailed": {
+            "Type": "Fail",
+            "Error": "ApplyBrandingFailed",
+            "Cause": "Branding step failed"
           },
           "StoreDraft": {
             "Type": "Task",
             "Resource": "${arn_lambda_storage}",
+            "Catch": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "Next": "StoreFailed",
+                "ResultPath": "$.error"
+              }
+            ],
             "End": true
+          },
+          "StoreFailed": {
+            "Type": "Fail",
+            "Error": "StoreDraftFailed",
+            "Cause": "Storage step failed"
           }
         }
       },

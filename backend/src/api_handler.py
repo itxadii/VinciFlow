@@ -71,7 +71,7 @@ def handler(event, context):
         # --- 4. CHAT / ROOT ---
         if normalized_path == "" or normalized_path == "/":
             if method == 'GET':
-                res = dynamodb_resource.Table(TABLE_NAME).query(KeyConditionExpression=boto3.dynamodb.conditions.Key('UserId').eq(user_id), ScanIndexForward=False, Limit=50)
+                res = dynamodb_resource.Table(TABLE_NAME).query(KeyConditionExpression=boto3.dynamodb.conditions.Key('UserId').eq(user_id), ScanIndexForward=True, Limit=50)
                 return {'statusCode': 200, 'headers': cors_headers, 'body': json.dumps({'history': res.get('Items', [])}, cls=DecimalEncoder)}
             
             elif method == 'POST':
@@ -123,78 +123,127 @@ def handler(event, context):
                         break
 
                 # ── If user is providing time as follow-up to a topic ──
-                has_date = any(w in user_prompt.lower() for w in ['january', 'february', 'march', 'april', 'may', 'june',
+                # ── Detect intent ──────────────────────────────────────────────
+                has_date = any(w in user_prompt.lower() for w in [
+                    'january', 'february', 'march', 'april', 'may', 'june',
                     'july', 'august', 'september', 'october', 'november', 'december',
                     'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-                    'tomorrow', 'tonight', 'today', 'pm', 'am', ':']) or any(c.isdigit() for c in user_prompt)
+                    'tomorrow', 'tonight', 'today', 'pm', 'am', ':'
+                ]) or any(c.isdigit() for c in user_prompt)
 
-                is_post_request = any(w in user_prompt.lower() for w in ["create", "generate", "post", "make"])
+                is_post_request = any(w in user_prompt.lower() for w in [
+                    "create", "generate", "post", "make", "schedule", "publish"
+                ])
 
-                # Trigger Step Function if:
-                # 1. Direct request with date in same message
-                # 2. Follow-up providing time after topic was already given
+                # ── Look for pending topic AND scheduled date in history ──────
+                pending_topic = None
+                pending_date = None
+                for h in reversed(past):
+                    agent_resp = h.get('AgentResponse', '').lower()
+                    user_msg = h.get('UserMessage', '').lower()
+
+                    # Detect if agent already confirmed a scheduled time
+                    if 'scheduled for' in agent_resp or 'preparing your flow' in agent_resp:
+                        # Extract the original topic from that history item
+                        pending_topic = h.get('UserMessage', '')
+                        # Try to find the date from AgentResponse
+                        import re
+                        date_match = re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}', h.get('AgentResponse', ''))
+                        if date_match:
+                            pending_date = date_match.group()
+                        break
+
+                    if any(phrase in agent_resp for phrase in [
+                        'what time', 'when would you like', 'schedule it',
+                        'provide the time', 'what date', 'specific time'
+                    ]):
+                        pending_topic = h.get('UserMessage', '')
+                        break
+
+                # ── Trigger conditions ─────────────────────────────────────────
                 should_trigger_sfn = (
                     (is_post_request and has_date) or
-                    (pending_topic and has_date and not is_post_request)
+                    (pending_topic and has_date and not is_post_request) or
+                    # ✅ New: user says generate/create and history already has topic+date
+                    (is_post_request and pending_topic and pending_date)
                 )
 
+                # ── Build combined prompt ──────────────────────────────────────
                 if should_trigger_sfn:
-                    # Build combined prompt from topic + timing if it's a follow-up
-                    if pending_topic and not is_post_request:
+                    if pending_topic and pending_date and not has_date:
+                        # Reconstruct full prompt from history context
+                        combined_prompt = f"{pending_topic} Schedule it for: {pending_date}"
+                    elif pending_topic and not is_post_request:
                         combined_prompt = f"{pending_topic} Schedule it for: {user_prompt}"
                     else:
                         combined_prompt = user_prompt
 
                     sfn_arn = ssm_client.get_parameter(Name="/vinciflow/dev/state_machine_arn")['Parameter']['Value']
+                    
+                    # ✅ Start execution ONCE
                     execution = sfn_client.start_execution(
                         stateMachineArn=sfn_arn,
                         input=json.dumps({
                             "userId": user_id,
                             "sessionId": session_id,
-                            "prompt": combined_prompt,  # ✅ full context: topic + time
+                            "prompt": combined_prompt,
                             "task": "PARSE",
                             "brandContext": {
-                                "name": brand_info.get('BrandName'),
-                                "industry": brand_info.get('Industry'),
-                                "tone": brand_info.get('Tone')
-                            }
+                            "name": brand_info.get('BrandName'),
+                            "industry": brand_info.get('Industry'),
+                            "tone": brand_info.get('Tone'),
+                            "logoUrl": brand_info.get('LogoUrl')  # ✅ so branding overlay works
+                        }
                         })
                     )
                     execution_arn = execution['executionArn']
 
-                    # Poll for result
+                    # ✅ Poll only 8s — enough to catch CLARIFICATION, not long enough to block image gen
                     start = time.time()
-                    while time.time() - start < 25:
+                    while time.time() - start < 8:
                         time.sleep(2)
                         desc = sfn_client.describe_execution(executionArn=execution_arn)
                         sfn_status = desc['status']
 
                         if sfn_status == 'SUCCEEDED':
                             output = json.loads(desc['output'])
-                            if output.get('task') == 'AWAIT_CLARIFICATION':
+                            raw_output = output[0] if isinstance(output, list) else output
+                            if raw_output.get('task') == 'AWAIT_CLARIFICATION':
+                                dynamodb_resource.Table(TABLE_NAME).put_item(Item={
+                                    'UserId': user_id,
+                                    'Timestamp': int(time.time()),
+                                    'SessionId': session_id,
+                                    'UserMessage': user_prompt,           # original topic prompt
+                                    'AgentResponse': raw_output.get('message')  # clarification question
+                                })
                                 return {
                                     'statusCode': 200,
                                     'headers': cors_headers,
                                     'body': json.dumps({
                                         'task': 'AWAIT_CLARIFICATION',
-                                        'message': output.get('message'),
-                                        'response': output.get('message')
+                                        'message': raw_output.get('message'),
+                                        'response': raw_output.get('message')
                                     })
                                 }
-                            return {
-                                'statusCode': 200,
-                                'headers': cors_headers,
-                                'body': json.dumps({'message': 'Pipeline Started'})
-                            }
+                            break  # GENERATE started — exit loop, return Pipeline Started below
+
                         elif sfn_status in ('FAILED', 'TIMED_OUT', 'ABORTED'):
                             return {
                                 'statusCode': 500,
                                 'headers': cors_headers,
-                                'body': json.dumps({'error': f'Pipeline {sfn_status}'})
+                                'body': json.dumps({'error': 'Pipeline failed'})
                             }
 
+                    # ✅ Always return this for GENERATE — frontend polls DynamoDB
+                    dynamodb_resource.Table(TABLE_NAME).put_item(Item={
+                        'UserId': user_id,
+                        'Timestamp': int(time.time()),
+                        'SessionId': session_id,
+                        'UserMessage': combined_prompt,
+                        'AgentResponse': f'⏳ Preparing your flow...'
+                    })
                     return {
-                        'statusCode': 202,
+                        'statusCode': 200,
                         'headers': cors_headers,
                         'body': json.dumps({'message': 'Pipeline Started'})
                     }

@@ -109,11 +109,17 @@ resource "aws_iam_role_policy" "lambda_access_policy" {
         Resource = "arn:aws:ssm:ap-south-1:256364432182:parameter/vinciflow/${var.env}/state_machine_arn"
       },
       {
+        "Effect": "Allow",
+        "Action": "ssm:GetParameter",
+        "Resource": "arn:aws:ssm:ap-south-1:*:parameter/corex/gemini_api_key"
+      },
+      {
         Effect = "Allow"
         Action = ["s3:PutObject", "s3:PutObjectAcl", "s3:GetObject"]
         Resource = [
         "${var.assets_bucket_arn}/logos/*",          
-        "${var.assets_bucket_arn}/generatedimages/*"
+        "${var.assets_bucket_arn}/generatedimages/*",
+        "${var.assets_bucket_arn}/generated/*"
       ]
       },
       {
