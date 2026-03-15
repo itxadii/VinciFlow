@@ -16,7 +16,9 @@ const Navbar = () => {
     
     <div className="fixed w-full top-6 z-50 px-4 flex justify-center bg-yellow">
       {/* Main Island Container */}
-      <nav className={`w-full max-w-5xl backdrop-blur-xl border border-gray-500 shadow-xl transition-all duration-300 bg-white ${isOpen ? 'rounded-3xl' : 'rounded-full'}`}>
+      <nav className={`w-full max-w-5xl backdrop-blur-xl border border-gray-500 shadow-xl transition-all duration-300 ${isOpen ? 'rounded-3xl' : 'rounded-full'}`}
+        style={{ background: 'rgba(255, 255, 255, 0.45)' }}
+      >
         <div className="px-6 py-3">
           <div className="flex justify-between items-center">
             <Link to="/" className="flex items-center gap-2">

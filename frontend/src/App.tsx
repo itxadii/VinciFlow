@@ -16,6 +16,7 @@ import ConnectX from './pages/auth/ConnectX';
 
 const App = () => {
   const location = useLocation();
+  const isLandingPage = location.pathname === '/';
   
   /** * FIX: startsWith use karna zyada robust hai trailing slashes ke liye.
    * Navbar/Icons hide on chat, onboarding, AND connect-x pages.
@@ -24,14 +25,14 @@ const App = () => {
     location.pathname.startsWith(path)
   );
 
+
   return (
     <>
-      {!isAppView && (
-        <>
-          <Navbar />
-          <FloatingIcons />
-        </>
-      )}
+      {!isAppView && 
+        <Navbar />
+      }
+       {!isAppView && !isLandingPage && 
+      <FloatingIcons />}
 
       <Routes>
         {/* Protected Application Routes */}

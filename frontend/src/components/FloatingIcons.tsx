@@ -3,6 +3,7 @@ import { Instagram, Twitter, Facebook, Send } from 'lucide-react';
 
 const FloatingIcons = () => {
   return (
+    <>
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
       {/* Background Aura Blobs - Exactly as per landing page */}
       <div className="absolute top-[-10%] left-[-20%] w-[60%] h-[60%] bg-pink-200/30 rounded-full blur-[120px] animate-pulse" />
@@ -13,7 +14,7 @@ const FloatingIcons = () => {
       <motion.div 
         animate={{ y: [0, -20, 0], rotate: [0, 10, 0] }} 
         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} 
-        className="absolute top-40 left-[10%] text-pink-400 opacity-30"
+        className="absolute top-40 left-[10%] text-pink-400 opacity-60"
       >
         <Instagram size={100} strokeWidth={1} />
       </motion.div>
@@ -21,7 +22,7 @@ const FloatingIcons = () => {
       <motion.div 
         animate={{ y: [0, 30, 0], rotate: [0, -10, 0] }} 
         transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }} 
-        className="absolute bottom-40 left-[8%] text-blue-400 opacity-40"
+        className="absolute bottom-40 left-[8%] text-blue-400 opacity-60"
       >
         <Twitter size={80} strokeWidth={1} />
       </motion.div>
@@ -29,7 +30,7 @@ const FloatingIcons = () => {
       <motion.div 
         animate={{ y: [0, -30, 0] }} 
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }} 
-        className="absolute top-60 right-[12%] text-indigo-500 opacity-30"
+        className="absolute top-60 right-[12%] text-indigo-500 opacity-60"
       >
         <Facebook size={120} strokeWidth={0.5} />
       </motion.div>
@@ -42,6 +43,7 @@ const FloatingIcons = () => {
         <Send size={150} strokeWidth={0.5} />
       </motion.div>
     </div>
+    </>
   );
 };
 
