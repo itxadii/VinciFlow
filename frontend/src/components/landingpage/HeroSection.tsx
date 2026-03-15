@@ -6,7 +6,7 @@ const items = [
     image: '/instagram_logo.png',
     link: '/integrations',
     title: 'Instagram',
-    description: 'Publish via Meta Graph API'
+    description: 'Publish directly via Meta Graph API'
   },
   {
     image: '/facebook_logo.png',
@@ -15,40 +15,40 @@ const items = [
     description: 'Auto-post to Pages & Groups'
   },
   {
-    image: '/twitter_logo.png',
+    image: '/x_logo.png',
     link: '/integrations',
     title: 'X (Twitter)',
     description: 'AI-optimised tweet threads'
   },
   {
+    image: '/brandaura_logo.png',
+    link: '/docs',
+    title: 'Brand Aura',
+    description: 'Your tone & style, injected into every post'
+  },
+  {
+    image: '/schedule_logo.jpeg',
+    link: '/docs',
+    title: 'Auto Schedule',
+    description: 'Posts fire at exact time, every time'
+  },
+  {
+    image: '/x_logo.png',
+    link: '/docs',
+    title: 'AI Posters',
+    description: 'Gemini generates on-brand visuals instantly'
+  },
+  {
     image: '/aws_logo.png',
     link: '/docs',
-    title: 'AWS',
-    description: 'Step Functions orchestration'
+    title: 'Batch Pipeline',
+    description: 'Generate 10 posts from one prompt'
   },
   {
-    image: '/gemini_logo.png',
+    image: '/multimodal_logo.png',
     link: '/docs',
-    title: 'Gemini AI',
-    description: 'AI-powered poster synthesis'
-  },
-  {
-    image: '/lambda_logo.png',
-    link: '/docs',
-    title: 'Lambda',
-    description: 'Serverless compute engine'
-  },
-  {
-    image: '/dynamo_logo.png',
-    link: '/docs',
-    title: 'DynamoDB',
-    description: 'Brand & content storage'
-  },
-  {
-    image: '/s3_logo.png',
-    link: '/docs',
-    title: 'Amazon S3',
-    description: 'Media asset storage'
+    title: 'Multimodal AI',
+    description: 'Upload PDFs & images for brand analysis'
   }
 ];
 

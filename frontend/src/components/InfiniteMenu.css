@@ -5,6 +5,14 @@
   overflow: hidden;
   position: relative;
   outline: none;
+  background: linear-gradient(135deg, 
+    #fce4ec 0%, 
+    #f3e5f5 20%, 
+    #e8eaf6 40%, 
+    #e3f2fd 60%, 
+    #f1f8e9 80%, 
+    #fff8e1 100%
+  );
 }
 
 #infinite-grid-menu-canvas:active {
@@ -19,7 +27,7 @@
   height: 60px;
   display: grid;
   place-items: center;
-  background: cyan;
+  background: rgb(181, 206, 205);
   border: none;
   border-radius: 50%;
   cursor: pointer;
@@ -105,4 +113,10 @@
   opacity: 0;
   pointer-events: none;
   transition: 0.1s ease;
+}
+@media (max-width: 800px) {
+  .face-title,
+  .face-description {
+    display: none;
+  }
 }

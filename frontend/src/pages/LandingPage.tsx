@@ -1,9 +1,11 @@
 import HeroSection from "@/components/landingpage/HeroSection";
+import Footer from '../components/landingpage/Footer';
 
 const LandingPage = () => {
   return (
     <div className="w-full" style={{ position: 'relative', zIndex: 2 }}>
       <HeroSection />
+      <Footer />
 
       {/* We can add a "Live Preview" section here next */}
       <section className="py-24" style={{ background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
