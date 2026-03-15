@@ -27,7 +27,7 @@ const items = [
     description: 'Your tone & style, injected into every post'
   },
   {
-    image: '/schedule_logo.jpeg',
+    image: '/schedule_logo.png',
     link: '/docs',
     title: 'Auto Schedule',
     description: 'Posts fire at exact time, every time'
