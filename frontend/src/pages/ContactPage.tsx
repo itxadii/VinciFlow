@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, MapPin, Send, MessageSquare, ArrowRight } from 'lucide-react';
+import { Mail, MapPin, Send } from 'lucide-react';
 import Footer from '../components/landingpage/Footer';
 
 const ContactPage: React.FC = () => {
