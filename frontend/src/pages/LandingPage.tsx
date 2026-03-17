@@ -13,11 +13,11 @@ const LandingPage = () => {
         
         {/* Section Header */}
         <div className="max-w-7xl mx-auto px-4 text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 font-['Montserrat'] text-slate-800 tracking-tight">
-            One Click. Everywhere.
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 font-['Handlee'] text-slate-800 tracking-tight">
+            From Idea → Published Content
           </h2>
           <p className="text-gray-500 text-lg md:text-xl font-['Montserrat']">
-            Your brand, synchronized across the social web.
+            No more content planning, designing, or scheduling manually.
           </p>
         </div>
         

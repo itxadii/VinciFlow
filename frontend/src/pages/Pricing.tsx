@@ -1,7 +1,7 @@
-import { Check } from 'lucide-react';
+import { Check, IndianRupee, indianRupee } from 'lucide-react';
 
 const tiers = [
-  { name: 'Starter', price: '0', features: ['5 AI Posters / month', 'Instagram Integration', 'Standard Resolution', 'Manual Posting'], button: 'Get Started' },
+  { name: 'Starter', price: '0', features: ['5 AI Posters / month', 'Standard Resolution', 'No Scheduling'], button: 'Get Started' },
   { name: 'Pro', price: '29', features: ['50 AI Posters / month', 'All Social Platforms', 'HD Quality (Imagen 3)', 'EventBridge Scheduling', 'Priority Support'], button: 'Start Free Trial', highlighted: true },
   { name: 'Scale', price: '99', features: ['Unlimited AI Posters', 'Multi-Cloud Backup', 'Custom Watermarking', 'API Access', 'Account Manager'], button: 'Contact Sales' },
 ];
@@ -16,8 +16,8 @@ const Pricing = () => (
       {tiers.map((tier) => (
         <div key={tier.name} className={`p-10 rounded-3xl border ${tier.highlighted ? 'border-purple-500 shadow-xl scale-105 bg-white relative' : 'border-gray-100 bg-white'}`}>
           {tier.highlighted && <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase">Most Popular</span>}
-          <h3 className="text-2xl font-bold mb-2">{tier.name}</h3>
-          <div className="mb-6"><span className="text-4xl font-bold">${tier.price}</span><span className="text-gray-500">/mo</span></div>
+          <h3 className="text-2xl font-bold mb-2"><IndianRupee />{tier.name}</h3>
+          <div className="mb-6"><span className="text-4xl font-bold">{tier.price}</span><span className="text-gray-500">/mo</span></div>
           <ul className="space-y-4 mb-8">
             {tier.features.map((f) => (
               <li key={f} className="flex items-center gap-3 text-sm text-gray-600">

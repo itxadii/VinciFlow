@@ -82,7 +82,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
           const response = await apiClient.post('/auth/x/callback', { code, state });
           if (response.status === 200) {
             toast.success("X Account Linked! 🚀");
-            navigate('/chat', { replace: true });
+            navigate('/app', { replace: true });
           }
         } catch (error) { toast.error("Aura Sync Failed."); }
         finally { setIsLoading(false); }

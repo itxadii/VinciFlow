@@ -44,7 +44,7 @@ const ConnectX: React.FC = () => {
           {loading ? "Generating Link..." : "Connect X (Twitter)"}
         </button>
 
-        <button onClick={() => navigate('/chat')} className="mt-8 text-slate-400 text-sm font-bold uppercase hover:text-slate-600">
+        <button onClick={() => navigate('/app')} className="mt-8 text-slate-400 text-sm font-bold uppercase hover:text-slate-600">
           Skip for now
         </button>
       </div>

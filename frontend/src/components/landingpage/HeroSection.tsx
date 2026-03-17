@@ -89,24 +89,39 @@ const HeroSection: React.FC = () => {
       {/* BOTTOM BLOCK: Main Text Content */}
       <div className="relative z-10 flex max-w-4xl flex-col items-center text-center">
 
-        <h1 className=" text-6xl font-extrabold tracking-tight text-[#555555] md:text-7xl font-['Merriweather']">
-          All-in-one <br />
-          <span className="bg-gradient-to-r from-[#FF4B8B] via-[#8E75C2] to-[#00C2FF] bg-clip-text text-transparent font-['Handlee']">Automation</span> platform
+        <h1 className=" text-4xl font-extrabold tracking-tight text-[#555555] md:text-7xl font-['Merriweather']">
+          Create <span className="bg-gradient-to-r from-[#FF4B8B] via-[#8E75C2] to-[#00C2FF] bg-clip-text text-transparent font-['Handlee']">30 days</span> 
+          <br/> of content
+          <span className="bg-gradient-to-r from-[#FF4B8B] via-[#8E75C2] to-[#00C2FF] bg-clip-text text-transparent font-['Handlee']"> in 5 minutes.</span>
         </h1>
 
-        <p className="mb-10 mt-5 max-w-xl text-lg font-medium text-gray-500 font-['Merriweather']">
-          Create and schedule 30 days of Instagram content in 5 minutes.
+        <p className="mt-6 text-lg text-gray-600 max-w-2xl mx-auto font-['Merriweather']">
+          VinciFlow creates branded posts for you and publishes them automatically — no manual work, no creative block.
         </p>
         
-        <span className="relative z-10 flex items-center gap-2 font-['Handlee']">
+        <span className="relative z-10 flex items-center gap-2 font-['Handlee'] mt-5">
           <button onClick={() => navigate('/signup')} className="flex items-center justify-center gap-2 px-10 py-5 backdrop-blur-sm text-slate-900 border-2 border-white rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all shadow-lg bg-yellow-100">
-            See the Magic ✨
+            Start Free
             {/* The SVG path is now properly wrapped inside an SVG tag */}
             <svg className="ml-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         </span>
+        <section className="flex justify-center items-center py-10 px-4">
+          <div className="max-w-2xl w-full text-center">
+            <span className="font-serif text-[120px] leading-none text-gray-200 block select-none">
+              &ldquo;
+            </span>
+            <p className="font-serif text-3xl md:text-4xl italic font-normal leading-relaxed tracking-tight text-gray-900">
+              Built for{" "}
+              <span className="not-italic font-semibold">D2C brands</span>,
+              founders &amp; creators who post{" "}
+              <span className="not-italic font-semibold">daily</span>
+            </p>
+            <div className="w-10 h-0.5 bg-gray-400 mx-auto mt-8 rounded-full" />
+          </div>
+        </section>
       </div>
 
     </section>

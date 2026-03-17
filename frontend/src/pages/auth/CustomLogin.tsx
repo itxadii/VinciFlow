@@ -20,7 +20,7 @@ export default function CustomLogin() {
   }, []);
 
   const navigateBasedOnBrand = async () => {
-    navigate('/chat', { replace: true });
+    navigate('/app', { replace: true });
   };
 
   useEffect(() => {

@@ -7,8 +7,6 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const navLinks = [
-    { name: 'Integrations', path: '/integrations' },
-    { name: 'Docs', path: '/docs' },
     { name: 'Pricing', path: '/pricing' },
   ];
 
