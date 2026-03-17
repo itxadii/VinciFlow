@@ -9,6 +9,7 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Pricing', path: '/pricing' },
     { name: 'Contact', path: '/contact' },
+    { name: 'About', path: '/about' },
   ];
 
   return (
@@ -28,7 +29,7 @@ const Navbar = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-6 font-[Handlee]">
               {navLinks.map((link) => (
                 <Link
                   key={link.name}
@@ -39,19 +40,24 @@ const Navbar = () => {
                 </Link>
               ))}
               <div className="h-6 w-px bg-gray-300 mx-2" />
+              
               <span className="font-['Handlee']">
-              <button onClick={() => navigate('/login')} className="text-sm font-bold text-slate-700 hover:text-slate-900">
-                Log in
-              </button>
+                {/* ADDED cursor-pointer HERE */}
+                <button onClick={() => navigate('/login')} className="cursor-pointer text-sm font-bold text-slate-700 hover:text-slate-900">
+                  Log in
+                </button>
               </span>
+              
               <span className="font-bold text-slate-900 font-['Handlee']">
-              <button 
-                onClick={() => navigate('/signup')}
-                className="bg-blue-600 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-              >
-                Get Started
-              </button>
+                {/* ADDED cursor-pointer HERE */}
+                <button 
+                  onClick={() => navigate('/signup')}
+                  className="cursor-pointer bg-blue-600 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                >
+                  Get Started
+                </button>
               </span>
+              
             </div>
 
             {/* Mobile Menu Toggle */}
@@ -81,13 +87,13 @@ const Navbar = () => {
               <div className="pt-4 border-t border-gray-200 flex flex-col gap-3">
                 <button 
                   onClick={() => { navigate('/login'); setIsOpen(false); }}
-                  className="w-full py-3 text-base font-bold text-slate-700 text-center"
+                  className="cursor-pointer w-full py-3 text-base font-bold text-slate-700 text-center"
                 >
                   Log in
                 </button>
                 <button 
                   onClick={() => { navigate('/signup'); setIsOpen(false); }}
-                  className="w-full bg-blue-400 text-white py-4 rounded-2xl font-bold text-center shadow-lg"
+                  className="cursor-pointer w-full bg-blue-400 text-white py-4 rounded-2xl font-bold text-center shadow-lg"
                 >
                   Get Started
                 </button>

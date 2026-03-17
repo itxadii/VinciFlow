@@ -100,7 +100,7 @@ const HeroSection: React.FC = () => {
         </p>
         
         <span className="relative z-10 flex items-center gap-2 font-['Handlee'] mt-5">
-          <button onClick={() => navigate('/signup')} className="flex items-center justify-center gap-2 px-10 py-5 backdrop-blur-sm text-slate-900 border-2 border-white rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all shadow-lg bg-yellow-100">
+          <button onClick={() => navigate('/signup')} className="cursor-pointer flex items-center justify-center gap-2 px-10 py-5 backdrop-blur-sm text-slate-900 border-2 border-white rounded-2xl font-bold text-lg hover:bg-gray-200 transition-all shadow-lg bg-yellow-100">
             Generate My First Post
             {/* The SVG path is now properly wrapped inside an SVG tag */}
             <svg className="ml-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

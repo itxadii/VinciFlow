@@ -33,10 +33,9 @@ const Footer = () => {
             {/* Social icons */}
             <div className="flex items-center gap-3 mt-2">
               {[
-                { icon: <Instagram size={17} />, href: 'https://instagram.com', color: '#ec4899' },
-                { icon: <Twitter size={17} />, href: 'https://twitter.com', color: '#3b82f6' },
-                { icon: <Facebook size={17} />, href: 'https://facebook.com', color: '#6366f1' },
-                { icon: <Github size={17} />, href: 'https://github.com', color: '#0f172a' },
+                { icon: <Instagram size={17} />, href: 'https://instagram.com/ifeelhonney', color: '#ec4899' },
+                { icon: <Twitter size={17} />, href: 'https://twitter.com/ifeelhonney', color: '#3b82f6' },
+                { icon: <Github size={17} />, href: 'https://github.com/itxadii/vinciflow', color: '#0f172a' },
               ].map((s, i) => (
                 <a
                   key={i}
@@ -60,30 +59,8 @@ const Footer = () => {
               <p className="text-xs font-bold tracking-widest text-slate-400 mb-4">PRODUCT</p>
               <ul className="space-y-2.5">
                 {[
-                  { label: 'Integrations', path: '/integrations' },
+                  { label: 'Contact', path: '/contact' },
                   { label: 'Pricing', path: '/pricing' },
-                  { label: 'Docs', path: '/docs' },
-                ].map(l => (
-                  <li key={l.label}>
-                    <Link
-                      to={l.path}
-                      className="text-sm text-slate-500 hover:text-slate-900 transition-colors duration-150"
-                    >
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <p className="text-xs font-bold tracking-widest text-slate-400 mb-4">PLATFORM</p>
-              <ul className="space-y-2.5">
-                {[
-                  { label: 'Brand Aura', path: '/docs' },
-                  { label: 'AI Posters', path: '/docs' },
-                  { label: 'Auto Schedule', path: '/docs' },
-                  { label: 'Publishing', path: '/docs' },
                 ].map(l => (
                   <li key={l.label}>
                     <Link

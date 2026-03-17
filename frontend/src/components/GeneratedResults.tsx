@@ -111,7 +111,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ image, content, onAccept, onRej
                     key={p.id}
                     type="button"
                     onClick={() => togglePlatform(p.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[15px] font-bold border transition-all active:scale-95 ${
+                    className={`cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[15px] font-bold border transition-all active:scale-95 ${
                       selected ? p.selectedBg : p.unselectedBg
                     }`}
                   >
@@ -130,7 +130,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ image, content, onAccept, onRej
             <button
               onClick={() => selectedPlatforms.length > 0 && onAccept(selectedPlatforms)}
               disabled={selectedPlatforms.length === 0}
-              className={`flex-1 py-2 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-md active:scale-95 ${
+              className={`cursor-pointer flex-1 py-2 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-md active:scale-95 ${
                 selectedPlatforms.length === 0
                   ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
                   : 'bg-slate-900 text-white hover:bg-black'
@@ -140,7 +140,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ image, content, onAccept, onRej
             </button>
             <button
               onClick={onReject}
-              className="flex-1 border border-slate-200 text-slate-600 py-2 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors active:scale-95"
+              className="cursor-pointer flex-1 border border-slate-200 text-slate-600 py-2 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors active:scale-95"
             >
               <X size={18} /> Reject
             </button>

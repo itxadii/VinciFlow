@@ -12,6 +12,7 @@ import Onboarding from './pages/auth/Onboarding';
 // 1. Import the new ConnectX component
 import ConnectX from './pages/auth/ConnectX';
 import ContactPage from './pages/ContactPage';
+import AboutPage from './pages/AboutPage';
 
 const App = () => {
   const location = useLocation();
@@ -61,6 +62,7 @@ const App = () => {
         />
 
         {/* Public Routes */}
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/signup" element={<CustomSignUp />} />
         <Route path="/confirm" element={<ConfirmAccount />} />
