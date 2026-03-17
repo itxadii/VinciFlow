@@ -12,7 +12,6 @@ body,
   padding: 0;
   width: 100vw;
   height: 100vh;
-  overflow: hidden;
 }
 
 :root {
@@ -57,7 +56,6 @@ body {
   /* REMOVED bg-slate-200 — this was bleeding into chat edges */
   @apply text-slate-900 antialiased;
   font-family: 'Montserrat', sans-serif;
-  overflow: hidden; /* explicit, not via @apply */
 }
 
 #root {
@@ -168,4 +166,11 @@ nav {
   html {
     @apply font-sans;
   }
+}
+
+/* At the bottom of your global css */
+html, body, #root {
+  overflow-y: auto !important;
+  height: auto !important;
+  min-height: 100vh;
 }

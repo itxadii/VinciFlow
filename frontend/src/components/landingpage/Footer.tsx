@@ -101,9 +101,9 @@ const Footer = () => {
               <p className="text-xs font-bold tracking-widest text-slate-400 mb-4">COMPANY</p>
               <ul className="space-y-2.5">
                 {[
-                  { label: 'About', path: '/' },
-                  { label: 'GitHub', path: 'https://github.com' },
-                  { label: 'LinkedIn', path: 'https://linkedin.com' },
+                  { label: 'About', path: '/about' },
+                  { label: 'GitHub', path: 'https://github.com/itxadii/vinciflow' },
+                  { label: 'LinkedIn', path: 'https://linkedin.com/xadi' },
                 ].map(l => (
                   <li key={l.label}>
                     <Link
@@ -127,7 +127,7 @@ const Footer = () => {
           <p className="text-xs text-slate-400">
             © {new Date().getFullYear()} VinciFlow. Built by{' '}
             <a
-              href="https://linkedin.com"
+              href="https://linkedin.com/xadi"
               target="_blank"
               rel="noopener noreferrer"
               className="font-semibold hover:text-slate-700 transition-colors"
@@ -135,10 +135,7 @@ const Footer = () => {
             >
               Aditya Waghmare
             </a>
-          </p>
-          <p className="text-xs text-slate-400">
-            Powered by AWS · Bedrock · Step Functions · Meta Graph API
-          </p>
+          </p>,
         </div>
 
       </div>
