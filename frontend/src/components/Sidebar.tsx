@@ -44,14 +44,14 @@ const Sidebar: React.FC<SidebarProps> = ({
             <Link to="/" className="hover:opacity-80 transition-opacity">
               <span className="text-2xl font-bold text-slate-800 font-['Handlee']">VinciFlow</span>
             </Link>
-            <button onClick={() => setIsOpen(false)} className="text-slate-600 hover:text-slate-900">
+            <button onClick={() => setIsOpen(false)} className="cursor-pointer text-slate-600 hover:text-slate-900">
               <PanelLeftClose size={20} />
             </button>
           </div>
 
           <button
             onClick={() => { onNewChat(); if (window.innerWidth < 768) setIsOpen(false); }}
-            className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-slate-400/20 border-4 border-slate-400 rounded-full hover:bg-slate-400/40 transition-all font-['Merriweather'] font-bold text-sm text-slate-800"
+            className="cursor-pointer flex items-center justify-center gap-2 w-full py-3 px-4 bg-slate-400/20 border-4 border-slate-400 rounded-full hover:bg-slate-400/40 transition-all font-['Merriweather'] font-bold text-sm text-slate-800"
           >
             <Workflow size={18} /> New Flow
           </button>
@@ -71,10 +71,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                 if (session.sessionId) onSelectSession(session.sessionId);
                 if (window.innerWidth < 768) setIsOpen(false);
               }}
-              className={`w-full text-left p-3 rounded-full transition-all ${
+              className={`cursor-pointer w-full text-left p-3 rounded-full transition-all ${
                 currentSessionId === session.sessionId
-                  ? 'bg-slate-400/50 text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-400/20'
+                  ? 'bg-slate-400/50 text-slate-900 shadow-sm border-4 border-slate-400/50'
+                  : 'text-slate-600 hover:bg-slate-400/20 border-3 border-slate-400/20 hover:border-slate-400'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -100,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <button
             onClick={handleSignOut}
-            className="w-full py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold text-slate-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+            className="cursor-pointer w-full py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold text-slate-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
           >
             <LogOut size={16} /> Sign Out
           </button>

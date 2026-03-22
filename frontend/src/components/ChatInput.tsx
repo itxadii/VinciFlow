@@ -32,7 +32,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedFile(null)}
-                className="text-slate-300 hover:text-red-400 transition-colors text-base leading-none px-1"
+                className="cursor-pointer text-slate-300 hover:text-red-400 transition-colors text-base leading-none px-1"
               >
                 ×
               </button>
@@ -52,7 +52,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all active:scale-90"
+              className="cursor-pointer p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all active:scale-90"
             >
               <Plus size={22} />
             </button>
@@ -68,7 +68,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             <button
               type="submit"
               disabled={isLoading || (!input.trim() && !selectedFile)}
-              className={`p-2 rounded-full transition-all shadow-sm ${
+              className={`cursor-pointer p-2 rounded-full transition-all shadow-sm ${
                 isLoading || (!input.trim() && !selectedFile)
                   ? 'bg-slate-100 text-slate-300'
                   : 'bg-slate-900 text-white hover:bg-black active:scale-95'

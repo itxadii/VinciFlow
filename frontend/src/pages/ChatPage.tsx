@@ -286,7 +286,7 @@ const ChatPage: React.FC<{ signOut?: () => void; user?: any }> = ({ signOut, use
       <div className="flex-1 flex overflow-hidden relative">
         <div className="flex flex-col min-w-0 h-full relative grow bg-transparent overflow-hidden">
           {!isSidebarOpen && (
-            <button onClick={() => setSidebarOpen(true)} className="absolute top-10 left-6 z-40 p-2.5 bg-white border border-[#E3DBBB] rounded-xl shadow-sm">
+            <button onClick={() => setSidebarOpen(true)} className="cursor-pointer absolute top-10 left-6 z-40 p-2.5 bg-white border border-[#E3DBBB] rounded-xl shadow-sm">
               <PanelLeftOpen size={20} className="text-slate-600" />
             </button>
           )}
