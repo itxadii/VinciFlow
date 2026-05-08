@@ -43,10 +43,10 @@ const ContactPage: React.FC = () => {
     <div className="flex flex-col min-h-screen w-full bg-[#fafafa]">
       
       {/* Main Content */}
-      <main className="flex-grow flex flex-col items-center justify-center py-30 px-6 relative z-10">
+      <main className="grow flex flex-col items-center justify-center py-30 px-6 relative z-10">
         
         {/* Background Glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-gradient-to-tr from-purple-200/40 to-pink-200/40 blur-[100px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-125 w-125 rounded-full bg-linear-to-tr from-purple-200/40 to-pink-200/40 blur-[100px] pointer-events-none" />
 
         <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 relative">
           
@@ -54,7 +54,7 @@ const ContactPage: React.FC = () => {
           <div className="flex flex-col justify-center">
             
             <h1 className="text-5xl md:text-6xl font-extrabold text-slate-800 mb-6 font-['Handlee'] tracking-tight">
-              Get in <span className="bg-gradient-to-r from-[#FF4B8B] to-[#8E75C2] bg-clip-text text-transparent font-['Handlee']">touch.</span>
+              Get in <span className="bg-linear-to-r from-[#FF4B8B] to-[#8E75C2] bg-clip-text text-transparent font-['Handlee']">touch.</span>
             </h1>
             
             <p className="text-lg text-slate-500 mb-12 font-['Montserrat'] leading-relaxed max-w-md">
